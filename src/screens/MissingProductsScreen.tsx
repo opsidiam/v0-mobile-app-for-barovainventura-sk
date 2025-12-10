@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from "react-native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../../App"
-import { api, type MissingProduct } from "../lib/api"
+import { api, type Product } from "../lib/api"
 import { Ionicons } from "@expo/vector-icons"
 
 type MissingProductsScreenProps = {
@@ -12,10 +12,9 @@ type MissingProductsScreenProps = {
 }
 
 export function MissingProductsScreen({ navigation }: MissingProductsScreenProps) {
-  const [products, setProducts] = useState<MissingProduct[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [count, setCount] = useState(0)
 
   useEffect(() => {
     fetchMissingProducts()
@@ -27,8 +26,7 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
   async function fetchMissingProducts() {
     try {
       const data = await api.getMissingProducts()
-      setProducts(data.products)
-      setCount(data.count)
+      setProducts(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("Failed to fetch missing products:", error)
     } finally {
@@ -46,14 +44,14 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
     navigation.navigate("Scanner", { pendingEan: ean })
   }
 
-  function renderItem({ item }: { item: MissingProduct }) {
+  function renderItem({ item }: { item: Product }) {
     return (
       <View style={styles.itemContainer}>
         <View style={styles.itemInfo}>
           <Text style={styles.itemName}>{item.name}</Text>
           <Text style={styles.itemEan}>{item.ean}</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => handleAddProduct(item.ean)}>
+        <TouchableOpacity style={styles.addButton} onPress={() => handleAddProduct(item.ean || "")}>
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -63,7 +61,7 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f9cff" />
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     )
   }
@@ -71,11 +69,11 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        {count > 0 ? (
+        {products.length > 0 ? (
           <View style={styles.headerWithBadge}>
             <Text style={styles.headerText}>Chýbajúce produkty:</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{count}</Text>
+              <Text style={styles.badgeText}>{products.length}</Text>
             </View>
           </View>
         ) : (
@@ -91,10 +89,10 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
       ) : (
         <FlatList
           data={products}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => item.ean || index.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4f9cff" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
         />
       )}
     </View>
@@ -104,18 +102,18 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   header: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a4e",
+    borderBottomColor: "#1a1a1a",
   },
   headerWithBadge: {
     flexDirection: "row",
@@ -123,11 +121,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerText: {
-    color: "#888",
+    color: "rgba(255,255,255,0.6)",
     fontSize: 14,
   },
   badge: {
-    backgroundColor: "#ff6b6b",
+    backgroundColor: "#ef4444",
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -143,8 +141,8 @@ const styles = StyleSheet.create({
   },
   itemContainer: {
     flexDirection: "row",
-    backgroundColor: "#2a2a4e",
-    borderRadius: 12,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 8,
     padding: 16,
     alignItems: "center",
   },
@@ -159,13 +157,13 @@ const styles = StyleSheet.create({
   },
   itemEan: {
     fontSize: 12,
-    color: "#888",
+    color: "rgba(255,255,255,0.5)",
   },
   addButton: {
-    backgroundColor: "#4f9cff",
+    backgroundColor: "#2e2e38",
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
   },

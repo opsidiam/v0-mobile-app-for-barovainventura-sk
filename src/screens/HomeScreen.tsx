@@ -13,46 +13,24 @@ type HomeScreenProps = {
 }
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
-  const { logout } = useAuth()
-  const [inventoryActive, setInventoryActive] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const { logout, userName } = useAuth()
   const [missingCount, setMissingCount] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    checkInventoryStatus()
     fetchMissingCount()
+    setLoading(false)
 
     const interval = setInterval(fetchMissingCount, 5000)
     return () => clearInterval(interval)
   }, [])
 
-  async function checkInventoryStatus() {
-    try {
-      const status = await api.getInventoryStatus()
-      setInventoryActive(status.active)
-    } catch (error) {
-      console.error("Failed to check inventory status:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function fetchMissingCount() {
     try {
       const data = await api.getMissingProducts()
-      setMissingCount(data.count)
+      setMissingCount(Array.isArray(data) ? data.length : 0)
     } catch (error) {
       console.error("Failed to fetch missing count:", error)
-    }
-  }
-
-  async function handleStartInventory() {
-    try {
-      await api.startInventory()
-      setInventoryActive(true)
-      navigation.navigate("Scanner", {})
-    } catch (error) {
-      Alert.alert("Chyba", "Nepodarilo sa začať inventúru")
     }
   }
 
@@ -66,7 +44,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f9cff" />
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     )
   }
@@ -74,51 +52,44 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Vitajte v inventúre</Text>
+        <View>
+          <Text style={styles.greeting}>Vitajte,</Text>
+          <Text style={styles.userName}>{userName || "Používateľ"}</Text>
+        </View>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#ff6b6b" />
+          <Ionicons name="log-out-outline" size={24} color="#ef4444" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.menuContainer}>
-        {inventoryActive ? (
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Scanner", {})}>
-            <View style={styles.menuIcon}>
-              <Ionicons name="barcode-outline" size={32} color="#4f9cff" />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Pokračovať v skenovaní</Text>
-              <Text style={styles.menuSubtitle}>Skenovať EAN kódy produktov</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#666" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.menuItem} onPress={handleStartInventory}>
-            <View style={styles.menuIcon}>
-              <Ionicons name="play-circle-outline" size={32} color="#4ade80" />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Začať inventúru</Text>
-              <Text style={styles.menuSubtitle}>Spustiť novú inventúru</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#666" />
-          </TouchableOpacity>
-        )}
+        {/* Scanner button */}
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Scanner", {})}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="barcode-outline" size={28} color="#fff" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Skenovanie produktov</Text>
+            <Text style={styles.menuSubtitle}>Skenovať EAN kódy produktov</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
+        </TouchableOpacity>
 
+        {/* Inventory list */}
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("InventoryList")}>
           <View style={styles.menuIcon}>
-            <Ionicons name="list-outline" size={32} color="#4f9cff" />
+            <Ionicons name="list-outline" size={28} color="#fff" />
           </View>
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Prehľad inventúry</Text>
             <Text style={styles.menuSubtitle}>Zobraziť naskenované produkty</Text>
           </View>
-          <Ionicons name="chevron-forward" size={24} color="#666" />
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
 
+        {/* Missing products */}
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("MissingProducts")}>
           <View style={styles.menuIcon}>
-            <Ionicons name="alert-circle-outline" size={32} color="#ff6b6b" />
+            <Ionicons name="alert-circle-outline" size={28} color="#fff" />
           </View>
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Nenaskenované produkty</Text>
@@ -129,7 +100,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               <Text style={styles.badgeText}>{missingCount}</Text>
             </View>
           )}
-          <Ionicons name="chevron-forward" size={24} color="#666" />
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
       </View>
     </View>
@@ -139,25 +110,29 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
-    paddingTop: 10,
   },
-  title: {
+  greeting: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.6)",
+  },
+  userName: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#fff",
+    marginTop: 4,
   },
   logoutButton: {
     padding: 8,
@@ -169,8 +144,8 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#2a2a4e",
-    borderRadius: 16,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
     padding: 16,
     gap: 12,
   },
@@ -178,7 +153,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#2e2e38",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -193,10 +168,10 @@ const styles = StyleSheet.create({
   },
   menuSubtitle: {
     fontSize: 14,
-    color: "#888",
+    color: "rgba(255,255,255,0.5)",
   },
   badge: {
-    backgroundColor: "#ff6b6b",
+    backgroundColor: "#ef4444",
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,

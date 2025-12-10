@@ -26,8 +26,8 @@ function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a2e" }}>
-        <ActivityIndicator size="large" color="#4f9cff" />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     )
   }
@@ -35,16 +35,17 @@ function AppNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: "#1a1a2e" },
+        headerStyle: { backgroundColor: "#000" },
         headerTintColor: "#fff",
-        contentStyle: { backgroundColor: "#1a1a2e" },
+        contentStyle: { backgroundColor: "#000" },
+        headerShadowVisible: false,
       }}
     >
       {!isAuthenticated ? (
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       ) : (
         <>
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: "Inventúra" }} />
+          <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Scanner" component={ScannerScreen} options={{ title: "Skenovanie" }} />
           <Stack.Screen name="InventoryList" component={InventoryListScreen} options={{ title: "Prehľad inventúry" }} />
           <Stack.Screen

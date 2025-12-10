@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Vibration,
@@ -17,6 +16,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RouteProp } from "@react-navigation/native"
 import type { RootStackParamList } from "../../App"
 import { api, type Product } from "../lib/api"
+import { useAuth } from "../lib/auth-context"
 import { Ionicons } from "@expo/vector-icons"
 
 type ScannerScreenProps = {
@@ -25,93 +25,150 @@ type ScannerScreenProps = {
 }
 
 export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
+  const { token } = useAuth()
   const [permission, requestPermission] = useCameraPermissions()
   const [manualEan, setManualEan] = useState("")
   const [product, setProduct] = useState<Product | null>(null)
+  const [currentEan, setCurrentEan] = useState("")
   const [quantity, setQuantity] = useState("0")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [scanStatus, setScanStatus] = useState<"scanning" | "verifying" | "found">("scanning")
+  const [error, setError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [scanStatus, setScanStatus] = useState<string>("Namierte na EAN kód")
   const [scanned, setScanned] = useState(false)
+  const [missingCount, setMissingCount] = useState(0)
+  const [scannedCount, setScannedCount] = useState(0)
 
   const lastScannedRef = useRef<string | null>(null)
   const scanCountRef = useRef(0)
   const isProcessingRef = useRef(false)
 
+  // Fetch missing count
+  useEffect(() => {
+    fetchMissingCount()
+    const interval = setInterval(fetchMissingCount, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  async function fetchMissingCount() {
+    try {
+      const missing = await api.getMissingProducts()
+      setMissingCount(Array.isArray(missing) ? missing.length : 0)
+    } catch (error) {
+      console.error("Failed to fetch missing count:", error)
+    }
+  }
+
+  // Handle pending EAN from navigation
   useEffect(() => {
     if (route.params?.pendingEan) {
       handleEanSubmit(route.params.pendingEan)
     }
   }, [route.params?.pendingEan])
 
+  // Clear error after 5s
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
+
   async function handleEanSubmit(ean: string) {
     if (!ean || ean.length < 8) {
-      Alert.alert("Chyba", "Zadajte platný EAN kód (8 alebo 13 číslic)")
+      setError("Zadajte platný EAN kód (8 alebo 13 číslic)")
       return
     }
 
     setLoading(true)
     setProduct(null)
+    setError(null)
+    setSaveSuccess(false)
+    setCurrentEan(ean)
 
     try {
-      const data = await api.getProduct(ean)
-      setProduct(data)
-      setQuantity(data.quantity_on_stock?.toString() || "0")
-      Vibration.vibrate(100)
-    } catch (error) {
-      Alert.alert("Chyba", "Produkt nebol nájdený")
-      setScanned(false)
+      const result = await api.getProductByEan(ean)
+
+      if (result.product_found) {
+        const foundProduct = Array.isArray(result.product_found) ? result.product_found[0] : result.product_found
+        setProduct(foundProduct)
+        const serverQuantity = foundProduct.quantity_on_stock
+        setQuantity(serverQuantity && serverQuantity !== "0" ? serverQuantity : "0")
+        Vibration.vibrate(100)
+      } else if (result.product_not_found) {
+        setError(`Produkt s EAN ${ean} nebol nájdený v databáze.`)
+        resetScanner()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Vyhľadávanie zlyhalo")
+      resetScanner()
     } finally {
       setLoading(false)
     }
   }
 
   async function handleSave() {
-    if (!product) return
+    if (!product || !currentEan) return
 
     setSaving(true)
+    setError(null)
+
     try {
-      await api.saveInventoryItem(product.ean, Number.parseFloat(quantity) || 0)
-      Alert.alert("Úspech", "Produkt bol uložený")
-      setProduct(null)
-      setQuantity("0")
-      setManualEan("")
-      lastScannedRef.current = null
-      scanCountRef.current = 0
-      setScanStatus("scanning")
-      setScanned(false)
-    } catch (error) {
-      Alert.alert("Chyba", "Nepodarilo sa uložiť produkt")
+      await api.updateProduct({
+        scan_id: product.scan_id,
+        ean: currentEan,
+        full_pack: quantity,
+        type: product.selling_method === "rozlievane" ? 0 : 1,
+      })
+
+      setScannedCount((prev) => prev + 1)
+      setSaveSuccess(true)
+
+      setTimeout(() => {
+        resetScanner()
+        setSaveSuccess(false)
+      }, 1000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Uloženie zlyhalo")
     } finally {
       setSaving(false)
     }
   }
 
+  function resetScanner() {
+    setProduct(null)
+    setCurrentEan("")
+    setQuantity("0")
+    setManualEan("")
+    lastScannedRef.current = null
+    scanCountRef.current = 0
+    setScanStatus("Namierte na EAN kód")
+    setScanned(false)
+    isProcessingRef.current = false
+  }
+
   function handleBarCodeScanned({ data }: { data: string }) {
-    if (isProcessingRef.current || product || scanned) return
+    if (isProcessingRef.current || product || scanned || loading) return
 
-    const scannedData = data
-
-    if (!/^(\d{8}|\d{13})$/.test(scannedData)) {
+    if (!/^(\d{8}|\d{13})$/.test(data)) {
       return
     }
 
-    if (lastScannedRef.current === scannedData) {
+    if (lastScannedRef.current === data) {
       scanCountRef.current += 1
-      setScanStatus("verifying")
+      setScanStatus(`Overujem ${data}...`)
 
       if (scanCountRef.current >= 2) {
         isProcessingRef.current = true
         setScanned(true)
-        setScanStatus("found")
-        handleEanSubmit(scannedData).finally(() => {
-          isProcessingRef.current = false
-        })
+        setScanStatus(`EAN ${data} overený!`)
+        handleEanSubmit(data)
       }
     } else {
-      lastScannedRef.current = scannedData
+      lastScannedRef.current = data
       scanCountRef.current = 1
-      setScanStatus("verifying")
+      setScanStatus(`Overujem ${data}...`)
     }
   }
 
@@ -121,20 +178,10 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     setQuantity(newValue.toString())
   }
 
-  function handleCancelProduct() {
-    setProduct(null)
-    setQuantity("0")
-    setManualEan("")
-    lastScannedRef.current = null
-    scanCountRef.current = 0
-    setScanStatus("scanning")
-    setScanned(false)
-  }
-
   if (!permission) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4f9cff" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     )
   }
@@ -142,7 +189,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
-        <Ionicons name="camera-outline" size={64} color="#666" />
+        <Ionicons name="camera-outline" size={64} color="rgba(255,255,255,0.4)" />
         <Text style={styles.permissionText}>Pre skenovanie EAN kódov je potrebný prístup ku kamere</Text>
         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
           <Text style={styles.permissionButtonText}>Povoliť kameru</Text>
@@ -153,95 +200,178 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {!product && (
-        <View style={styles.cameraContainer}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["ean8", "ean13"],
-            }}
-          />
-          <View style={styles.scanOverlay}>
-            <View style={styles.scanFrame} />
-          </View>
-          <View style={styles.scanStatusContainer}>
-            <Text style={styles.scanStatusText}>
-              {scanStatus === "scanning" && "Nasmerujte kameru na EAN kód"}
-              {scanStatus === "verifying" && "Overujem kód..."}
-              {scanStatus === "found" && "Kód nájdený!"}
-            </Text>
-          </View>
+      {/* Navigation buttons */}
+      <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("InventoryList")}>
+        <View style={styles.navButtonLeft}>
+          <Ionicons name="list-outline" size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.navButtonText}>Prehľad inventúry</Text>
+        </View>
+        <View style={styles.navButtonRight}>
+          <Text style={styles.navButtonCount}>{scannedCount} produktov</Text>
+          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
+        <View style={styles.navButtonLeft}>
+          <Ionicons name="alert-circle-outline" size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
+          {missingCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{missingCount}</Text>
+            </View>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+      </TouchableOpacity>
+
+      {/* Error message */}
+      {error && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={16} color="#f87171" />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      {!product && (
-        <View style={styles.manualInputContainer}>
-          <Text style={styles.sectionTitle}>Alebo zadajte EAN manuálne</Text>
-          <View style={styles.manualInputRow}>
-            <TextInput
-              style={styles.manualInput}
-              placeholder="EAN kód"
-              placeholderTextColor="#666"
-              value={manualEan}
-              onChangeText={setManualEan}
-              keyboardType="numeric"
-              maxLength={13}
+      {/* Success message */}
+      {saveSuccess && (
+        <View style={styles.successContainer}>
+          <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
+          <Text style={styles.successText}>Produkt uložený!</Text>
+        </View>
+      )}
+
+      {/* Camera */}
+      {!product && !saveSuccess && (
+        <>
+          <View style={styles.cameraContainer}>
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ["ean8", "ean13"],
+              }}
             />
+            <View style={styles.scanOverlay}>
+              <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+              </View>
+            </View>
+            <View style={styles.scanStatusContainer}>
+              <View style={styles.scanStatusBadge}>
+                <Text style={styles.scanStatusText}>{loading ? "Hľadám produkt..." : scanStatus}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Manual input */}
+          <View style={styles.manualInputContainer}>
+            <Text style={styles.sectionTitle}>Manuálne zadanie EAN</Text>
+            <Text style={styles.sectionSubtitle}>Alebo zadajte EAN kód ručne</Text>
+
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="123 456 789 1011"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={manualEan}
+                onChangeText={setManualEan}
+                keyboardType="numeric"
+                maxLength={13}
+              />
+              {manualEan.length > 0 && (
+                <TouchableOpacity style={styles.clearButton} onPress={() => setManualEan("")}>
+                  <Ionicons name="close" size={20} color="rgba(255,255,255,0.4)" />
+                </TouchableOpacity>
+              )}
+            </View>
+
             <TouchableOpacity
-              style={[styles.searchButton, loading && styles.buttonDisabled]}
+              style={[styles.submitButton, loading && styles.buttonDisabled]}
               onPress={() => handleEanSubmit(manualEan)}
-              disabled={loading}
+              disabled={loading || !manualEan.trim()}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.buttonText}>Hľadám...</Text>
+                </View>
               ) : (
-                <Ionicons name="search" size={24} color="#fff" />
+                <Text style={styles.buttonText}>Zadať EAN</Text>
               )}
             </TouchableOpacity>
           </View>
-        </View>
+        </>
       )}
 
-      {product && (
+      {/* Product detail */}
+      {product && !saveSuccess && (
         <View style={styles.productContainer}>
-          <View style={styles.productHeader}>
-            <Text style={styles.productName}>{product.name}</Text>
-            <TouchableOpacity onPress={handleCancelProduct}>
-              <Ionicons name="close-circle" size={28} color="#ff6b6b" />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.productEan}>EAN: {product.ean}</Text>
-
-          <View style={styles.quantityContainer}>
-            <Text style={styles.quantityLabel}>Počet ({product.unit})</Text>
-            <View style={styles.quantityControls}>
-              <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(-1)}>
-                <Ionicons name="remove" size={24} color="#fff" />
+          <View style={styles.productCard}>
+            <View style={styles.productHeader}>
+              <View style={styles.productIcon}>
+                <Text style={styles.productIconText}>🍾</Text>
+              </View>
+              <View style={styles.productInfo}>
+                <View style={styles.productTitleRow}>
+                  <Text style={styles.productName}>{product.name}</Text>
+                  {product.alcohol_content && product.alcohol_content !== "0" && (
+                    <Text style={styles.productAlcohol}>{product.alcohol_content}%</Text>
+                  )}
+                </View>
+                <Text style={styles.productEan}>{currentEan}</Text>
+                <View style={styles.productMeta}>
+                  {product.volume && <Text style={styles.productVolume}>{product.volume}</Text>}
+                  <Text style={styles.productQuantity}>{quantity || "?"} ks</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={resetScanner} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#f87171" />
               </TouchableOpacity>
+            </View>
 
-              <TextInput
-                style={styles.quantityInput}
-                value={quantity}
-                onChangeText={setQuantity}
-                keyboardType="numeric"
-                textAlign="center"
-              />
+            <View style={styles.quantitySection}>
+              <Text style={styles.quantityLabel}>Počet na sklade</Text>
+              <View style={styles.quantityControls}>
+                <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(-1)}>
+                  <Ionicons name="remove" size={24} color="#fff" />
+                </TouchableOpacity>
 
-              <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(1)}>
-                <Ionicons name="add" size={24} color="#fff" />
-              </TouchableOpacity>
+                <View style={styles.quantityInputContainer}>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    keyboardType="numeric"
+                    textAlign="center"
+                  />
+                  <Text style={styles.quantityUnit}>ks</Text>
+                </View>
+
+                <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(1)}>
+                  <Ionicons name="add" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
           <TouchableOpacity
             style={[styles.saveButton, saving && styles.buttonDisabled]}
             onPress={handleSave}
-            disabled={saving}
+            disabled={saving || !quantity}
           >
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Uložiť</Text>}
+            {saving ? (
+              <View style={styles.buttonContent}>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.saveButtonText}>Ukladám...</Text>
+              </View>
+            ) : (
+              <Text style={styles.saveButtonText}>Uložiť</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -252,41 +382,115 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   contentContainer: {
-    paddingBottom: 24,
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
   },
   permissionContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   permissionText: {
-    color: "#888",
+    color: "rgba(255,255,255,0.6)",
     fontSize: 16,
     textAlign: "center",
     marginTop: 16,
     marginBottom: 24,
   },
   permissionButton: {
-    backgroundColor: "#4f9cff",
+    backgroundColor: "#2e2e38",
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   permissionButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
+  navButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  navButtonLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  navButtonRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  navButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  navButtonCount: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 14,
+  },
+  badge: {
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(239,68,68,0.2)",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#f87171",
+    fontSize: 14,
+    flex: 1,
+  },
+  successContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(74,222,128,0.2)",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  successText: {
+    color: "#4ade80",
+    fontSize: 14,
+  },
   cameraContainer: {
-    height: 300,
-    margin: 16,
-    borderRadius: 16,
+    aspectRatio: 4 / 3,
+    borderRadius: 8,
     overflow: "hidden",
+    marginBottom: 16,
     position: "relative",
   },
   camera: {
@@ -298,90 +502,186 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scanFrame: {
-    width: 250,
-    height: 150,
+    width: "75%",
+    height: "33%",
     borderWidth: 2,
-    borderColor: "#4f9cff",
-    borderRadius: 12,
-    backgroundColor: "transparent",
+    borderColor: "rgba(255,255,255,0.5)",
+    borderRadius: 8,
+    position: "relative",
+  },
+  corner: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderColor: "#fff",
+  },
+  cornerTL: {
+    top: -2,
+    left: -2,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderTopLeftRadius: 8,
+  },
+  cornerTR: {
+    top: -2,
+    right: -2,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderTopRightRadius: 8,
+  },
+  cornerBL: {
+    bottom: -2,
+    left: -2,
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    borderBottomLeftRadius: 8,
+  },
+  cornerBR: {
+    bottom: -2,
+    right: -2,
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    borderBottomRightRadius: 8,
   },
   scanStatusContainer: {
     position: "absolute",
-    bottom: 16,
+    bottom: 12,
     left: 0,
     right: 0,
     alignItems: "center",
   },
+  scanStatusBadge: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
   scanStatusText: {
-    color: "#fff",
-    fontSize: 14,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
   },
   manualInputContainer: {
-    padding: 16,
+    marginBottom: 16,
   },
   sectionTitle: {
-    color: "#888",
+    color: "#fff",
     fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
     marginBottom: 12,
   },
-  manualInputRow: {
+  inputRow: {
     flexDirection: "row",
-    gap: 12,
+    alignItems: "center",
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  manualInput: {
+  input: {
     flex: 1,
-    backgroundColor: "#2a2a4e",
-    borderRadius: 12,
-    padding: 16,
+    height: 48,
+    paddingHorizontal: 16,
     fontSize: 16,
     color: "#fff",
-    borderWidth: 1,
-    borderColor: "#3a3a5e",
+    textAlign: "center",
   },
-  searchButton: {
-    backgroundColor: "#4f9cff",
-    borderRadius: 12,
-    width: 56,
-    justifyContent: "center",
+  clearButton: {
+    padding: 12,
+  },
+  submitButton: {
+    height: 48,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.5,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
   },
   productContainer: {
-    margin: 16,
-    backgroundColor: "#2a2a4e",
-    borderRadius: 16,
-    padding: 20,
+    flex: 1,
+  },
+  productCard: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 8,
+    padding: 16,
   },
   productHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
+    gap: 12,
+  },
+  productIcon: {
+    width: 64,
+    height: 64,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  productIconText: {
+    fontSize: 32,
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productTitleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
   },
   productName: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: "bold",
     color: "#fff",
-    marginRight: 12,
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
+  },
+  productAlcohol: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
   },
   productEan: {
-    fontSize: 14,
-    color: "#888",
-    marginBottom: 24,
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+    marginTop: 4,
   },
-  quantityContainer: {
-    marginBottom: 24,
+  productMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  productVolume: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+  productQuantity: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  closeButton: {
+    padding: 4,
+  },
+  quantitySection: {
+    marginTop: 16,
   },
   quantityLabel: {
+    color: "rgba(255,255,255,0.6)",
     fontSize: 14,
-    color: "#888",
     marginBottom: 12,
   },
   quantityControls: {
@@ -392,30 +692,42 @@ const styles = StyleSheet.create({
   quantityButton: {
     width: 48,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: "#4f9cff",
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
   },
+  quantityInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
+    paddingRight: 16,
+  },
   quantityInput: {
     flex: 1,
-    backgroundColor: "#1a1a2e",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    fontWeight: "bold",
+    height: 48,
+    fontSize: 20,
+    fontWeight: "600",
     color: "#fff",
     textAlign: "center",
   },
+  quantityUnit: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 14,
+  },
   saveButton: {
-    backgroundColor: "#4ade80",
-    borderRadius: 12,
-    padding: 16,
+    height: 48,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
   },
   saveButtonText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "500",
   },
 })

@@ -7,17 +7,22 @@ import { api } from "./api"
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
+  token: string | null
+  userName: string | null
+  login: (userId: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const TOKEN_KEY = "auth_token"
+const USER_NAME_KEY = "user_name"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [token, setToken] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
 
   useEffect(() => {
     loadToken()
@@ -25,9 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadToken() {
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY)
-      if (token) {
-        api.setToken(token)
+      const savedToken = await SecureStore.getItemAsync(TOKEN_KEY)
+      const savedUserName = await SecureStore.getItemAsync(USER_NAME_KEY)
+      if (savedToken) {
+        api.setToken(savedToken)
+        setToken(savedToken)
+        setUserName(savedUserName)
         setIsAuthenticated(true)
       }
     } catch (error) {
@@ -37,20 +45,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(username: string, password: string) {
-    const response = await api.login(username, password)
+  async function login(userId: string, password: string) {
+    const response = await api.login(userId, password)
     await SecureStore.setItemAsync(TOKEN_KEY, response.token)
+    await SecureStore.setItemAsync(USER_NAME_KEY, response.user_name || "")
     api.setToken(response.token)
+    setToken(response.token)
+    setUserName(response.user_name || null)
     setIsAuthenticated(true)
   }
 
   async function logout() {
+    try {
+      await api.logout()
+    } catch (error) {
+      // Ignore logout errors
+    }
     await SecureStore.deleteItemAsync(TOKEN_KEY)
+    await SecureStore.deleteItemAsync(USER_NAME_KEY)
     api.setToken(null)
+    setToken(null)
+    setUserName(null)
     setIsAuthenticated(false)
   }
 
-  return <AuthContext.Provider value={{ isAuthenticated, isLoading, login, logout }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, token, userName, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

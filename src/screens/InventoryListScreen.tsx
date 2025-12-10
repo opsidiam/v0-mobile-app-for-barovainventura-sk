@@ -1,43 +1,33 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from "react-native"
-import { api, type InventoryItem } from "../lib/api"
 import { Ionicons } from "@expo/vector-icons"
 
+interface ScannedItem {
+  id: string
+  name: string
+  ean: string
+  quantity: number
+  unit: string
+}
+
 export function InventoryListScreen() {
-  const [items, setItems] = useState<InventoryItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [items, setItems] = useState<ScannedItem[]>([])
+  const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [total, setTotal] = useState(0)
-
-  useEffect(() => {
-    fetchInventory()
-  }, [])
-
-  async function fetchInventory() {
-    try {
-      const data = await api.getInventoryList()
-      setItems(data.items)
-      setTotal(data.total)
-    } catch (error) {
-      console.error("Failed to fetch inventory:", error)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
-    fetchInventory()
+    // Items are stored locally for now
+    setRefreshing(false)
   }, [])
 
-  function renderItem({ item }: { item: InventoryItem }) {
+  function renderItem({ item }: { item: ScannedItem }) {
     return (
       <View style={styles.itemContainer}>
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.product_name}</Text>
+          <Text style={styles.itemName}>{item.name}</Text>
           <Text style={styles.itemEan}>{item.ean}</Text>
         </View>
         <View style={styles.itemQuantity}>
@@ -52,7 +42,7 @@ export function InventoryListScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f9cff" />
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     )
   }
@@ -60,21 +50,22 @@ export function InventoryListScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Celkom produktov: {total}</Text>
+        <Text style={styles.headerText}>Celkom produktov: {items.length}</Text>
       </View>
 
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="cube-outline" size={64} color="#666" />
+          <Ionicons name="cube-outline" size={64} color="rgba(255,255,255,0.4)" />
           <Text style={styles.emptyText}>Žiadne naskenované produkty</Text>
+          <Text style={styles.emptySubtext}>Naskenujte produkty pomocou kamery</Text>
         </View>
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4f9cff" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
         />
       )}
     </View>
@@ -84,21 +75,21 @@ export function InventoryListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#000",
   },
   header: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a4e",
+    borderBottomColor: "#1a1a1a",
   },
   headerText: {
-    color: "#888",
+    color: "rgba(255,255,255,0.6)",
     fontSize: 14,
   },
   listContent: {
@@ -107,8 +98,8 @@ const styles = StyleSheet.create({
   },
   itemContainer: {
     flexDirection: "row",
-    backgroundColor: "#2a2a4e",
-    borderRadius: 12,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 8,
     padding: 16,
     alignItems: "center",
   },
@@ -123,10 +114,10 @@ const styles = StyleSheet.create({
   },
   itemEan: {
     fontSize: 12,
-    color: "#888",
+    color: "rgba(255,255,255,0.5)",
   },
   itemQuantity: {
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#2e2e38",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -134,7 +125,7 @@ const styles = StyleSheet.create({
   quantityText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#4f9cff",
+    color: "#fff",
   },
   emptyContainer: {
     flex: 1,
@@ -143,8 +134,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: "#888",
+    color: "rgba(255,255,255,0.6)",
     fontSize: 16,
     marginTop: 16,
+  },
+  emptySubtext: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 14,
+    marginTop: 8,
   },
 })
