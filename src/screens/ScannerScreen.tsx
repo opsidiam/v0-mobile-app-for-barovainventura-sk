@@ -113,8 +113,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         setScanStatus("Produkt nájdený!")
       } else if (result.product_not_found) {
         console.log("[v0] Product not found:", ean)
-        const notFoundMsg = result.product_not_found_msg || `Produkt s EAN ${ean} nebol nájdený v databáze.`
-        setError(notFoundMsg)
+        setError("Produkt neexistuje. Pre vytvorenie produktu použite PC aplikáciu.")
         setScanStatus("Produkt neexistuje")
         Vibration.vibrate([0, 200, 100, 200])
         setTimeout(() => {
