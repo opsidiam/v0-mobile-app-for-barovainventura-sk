@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useAuth } from "../lib/auth-context"
@@ -42,7 +43,7 @@ export function LoginScreen() {
     try {
       await login(userId, password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Prihlásenie zlyhalo")
+      setError("Nepodarilo sa prihlásiť. Skontrolujte si prihlasovacie údaje.")
     } finally {
       setLoading(false)
     }
@@ -109,6 +110,14 @@ export function LoginScreen() {
             ) : (
               <Text style={styles.buttonText}>Prihlásiť sa</Text>
             )}
+          </TouchableOpacity>
+
+          {/* Tutorial link */}
+          <TouchableOpacity
+            onPress={() => Linking.openURL("https://barovainventura.sk/tutorial")}
+            style={styles.tutorialLink}
+          >
+            <Text style={styles.tutorialText}>návody</Text>
           </TouchableOpacity>
 
           <Text style={styles.infoText}>
@@ -202,6 +211,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  tutorialLink: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  tutorialText: {
+    color: "#3b82f6",
+    fontSize: 14,
+    textDecorationLine: "underline",
   },
   infoText: {
     textAlign: "center",
