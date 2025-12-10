@@ -19,7 +19,7 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RouteProp } from "@react-navigation/native"
-import type { RootStackParamList, ScannedProduct } from "../../App"
+import type { RootStackParamList } from "../../App"
 import { api, type Product } from "../lib/api"
 import { useAuth } from "../lib/auth-context"
 import { Ionicons } from "@expo/vector-icons"
@@ -46,7 +46,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   const [scanStatus, setScanStatus] = useState<string>("Namierte na EAN kód")
   const [cameraActive, setCameraActive] = useState(true)
   const [missingCount, setMissingCount] = useState(0)
-  const [scannedProducts, setScannedProducts] = useState<ScannedProduct[]>([])
+  const [scannedProducts, setScannedProducts] = useState<Product[]>([])
 
   const lastScannedRef = useRef<string | null>(null)
   const scanCountRef = useRef(0)
@@ -144,13 +144,14 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         type: product.selling_method === "rozlievane" ? 0 : 1,
       })
 
-      const newScannedProduct: ScannedProduct = {
+      const newScannedProduct: Product = {
+        scan_id: product.scan_id,
         ean: currentEan,
         name: product.name,
-        quantity: quantity,
+        quantity_on_stock: quantity,
         volume: product.volume,
-        alcoholContent: product.alcohol_content,
-        scannedAt: new Date(),
+        alcohol_content: product.alcohol_content,
+        selling_method: product.selling_method,
       }
       setScannedProducts((prev) => [...prev, newScannedProduct])
 
