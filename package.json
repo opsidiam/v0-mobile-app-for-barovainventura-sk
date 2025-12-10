@@ -49,7 +49,7 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
     "expo": "latest",
-    "expo-barcode-scanner": "latest",
+    "expo-barcode-scanner": "13.0.1",
     "expo-camera": "latest",
     "expo-font": "latest",
     "expo-secure-store": "latest",

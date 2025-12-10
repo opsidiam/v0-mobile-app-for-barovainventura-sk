@@ -129,7 +129,7 @@ importers:
         specifier: latest
         version: 54.0.27(@babel/core@7.28.5)(react-native@0.83.0(@babel/core@7.28.5)(@types/react@19.0.0)(react@19.2.0))(react@19.2.0)
       expo-barcode-scanner:
-        specifier: latest
+        specifier: 13.0.1
         version: 13.0.1(expo@54.0.27(@babel/core@7.28.5)(react-native@0.83.0(@babel/core@7.28.5)(@types/react@19.0.0)(react@19.2.0))(react@19.2.0))
       expo-camera:
         specifier: latest

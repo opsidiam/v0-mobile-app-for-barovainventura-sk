@@ -12,7 +12,7 @@ import {
   ScrollView,
   Vibration,
 } from "react-native"
-import { BarCodeScanner } from "expo-barcode-scanner"
+import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RouteProp } from "@react-navigation/native"
 import type { RootStackParamList } from "../../App"
@@ -25,7 +25,7 @@ type ScannerScreenProps = {
 }
 
 export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [permission, requestPermission] = useCameraPermissions()
   const [manualEan, setManualEan] = useState("")
   const [product, setProduct] = useState<Product | null>(null)
   const [quantity, setQuantity] = useState("0")
@@ -37,14 +37,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   const lastScannedRef = useRef<string | null>(null)
   const scanCountRef = useRef(0)
   const isProcessingRef = useRef(false)
-
-  useEffect(() => {
-    const getBarCodeScannerPermissions = async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync()
-      setHasPermission(status === "granted")
-    }
-    getBarCodeScannerPermissions()
-  }, [])
 
   useEffect(() => {
     if (route.params?.pendingEan) {
@@ -95,7 +87,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     }
   }
 
-  function handleBarCodeScanned({ type, data }: { type: string; data: string }) {
+  function handleBarCodeScanned({ data }: { data: string }) {
     if (isProcessingRef.current || product || scanned) return
 
     const scannedData = data
@@ -139,7 +131,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     setScanned(false)
   }
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#4f9cff" />
@@ -147,18 +139,12 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     )
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
         <Ionicons name="camera-outline" size={64} color="#666" />
         <Text style={styles.permissionText}>Pre skenovanie EAN kódov je potrebný prístup ku kamere</Text>
-        <TouchableOpacity
-          style={styles.permissionButton}
-          onPress={async () => {
-            const { status } = await BarCodeScanner.requestPermissionsAsync()
-            setHasPermission(status === "granted")
-          }}
-        >
+        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
           <Text style={styles.permissionButtonText}>Povoliť kameru</Text>
         </TouchableOpacity>
       </View>
@@ -169,10 +155,13 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {!product && (
         <View style={styles.cameraContainer}>
-          <BarCodeScanner
+          <CameraView
             style={styles.camera}
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-            barCodeTypes={[BarCodeScanner.Constants.BarCodeType.ean8, BarCodeScanner.Constants.BarCodeType.ean13]}
+            facing="back"
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ["ean8", "ean13"],
+            }}
           />
           <View style={styles.scanOverlay}>
             <View style={styles.scanFrame} />
