@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import { AlertCircle, Loader2, Eye, EyeOff } from "lucide-react"
 
@@ -12,6 +13,13 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,16 +37,14 @@ export function LoginForm() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-black px-6 py-12">
-      {/* Logo - presne podľa PDF: "inventúra" malým, "BAROVÁ" veľkým */}
-      <div className="mb-12 flex flex-col items-center text-center">
-        <p className="text-sm font-normal tracking-wide text-white/70">inventúra</p>
-        <h1 className="text-4xl font-bold text-white">BAROVÁ</h1>
+      <div className="mb-12">
+        <Image src="/logo.png" alt="BAROVÁ inventúra" width={200} height={60} className="h-14 w-auto" priority />
       </div>
 
       {/* Formulár */}
       <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
         {error && (
-          <div className="flex items-center gap-2 rounded-lg bg-destructive/20 p-3 text-sm text-white">
+          <div className="flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-400">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
