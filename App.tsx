@@ -10,10 +10,19 @@ import { MissingProductsScreen } from "./src/screens/MissingProductsScreen"
 import { StatusBar } from "expo-status-bar"
 import { ActivityIndicator, View } from "react-native"
 
+export type ScannedProduct = {
+  ean: string
+  name: string
+  quantity: string
+  volume?: string
+  alcoholContent?: string
+  scannedAt: Date
+}
+
 export type RootStackParamList = {
   Login: undefined
   Scanner: { pendingEan?: string }
-  InventoryList: undefined
+  InventoryList: { products: ScannedProduct[] }
   MissingProducts: undefined
 }
 
@@ -54,16 +63,14 @@ function AppNavigator() {
             name="InventoryList"
             component={InventoryListScreen}
             options={{
-              title: "Prehľad inventúry",
-              headerBackTitle: "Späť",
+              headerShown: false,
             }}
           />
           <Stack.Screen
             name="MissingProducts"
             component={MissingProductsScreen}
             options={{
-              title: "Nenaskenované produkty",
-              headerBackTitle: "Späť",
+              headerShown: false,
             }}
           />
         </>

@@ -11,11 +11,14 @@ import {
   ScrollView,
   Vibration,
   SafeAreaView,
+  Image,
+  StatusBar,
+  Platform,
 } from "react-native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RouteProp } from "@react-navigation/native"
-import type { RootStackParamList } from "../../App"
+import type { RootStackParamList, ScannedProduct } from "../../App"
 import { api, type Product } from "../lib/api"
 import { useAuth } from "../lib/auth-context"
 import { Ionicons } from "@expo/vector-icons"
@@ -26,7 +29,7 @@ type ScannerScreenProps = {
 }
 
 export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
-  const { token, logout } = useAuth()
+  const { user, logout } = useAuth()
   const [permission, requestPermission] = useCameraPermissions()
   const [manualEan, setManualEan] = useState("")
   const [product, setProduct] = useState<Product | null>(null)
@@ -39,7 +42,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   const [scanStatus, setScanStatus] = useState<string>("Namierte na EAN kód")
   const [cameraActive, setCameraActive] = useState(true)
   const [missingCount, setMissingCount] = useState(0)
-  const [scannedCount, setScannedCount] = useState(0)
+  const [scannedProducts, setScannedProducts] = useState<ScannedProduct[]>([])
 
   const lastScannedRef = useRef<string | null>(null)
   const scanCountRef = useRef(0)
@@ -133,7 +136,16 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         type: product.selling_method === "rozlievane" ? 0 : 1,
       })
 
-      setScannedCount((prev) => prev + 1)
+      const newScannedProduct: ScannedProduct = {
+        ean: currentEan,
+        name: product.name,
+        quantity: quantity,
+        volume: product.volume,
+        alcoholContent: product.alcohol_content,
+        scannedAt: new Date(),
+      }
+      setScannedProducts((prev) => [...prev, newScannedProduct])
+
       setSaveSuccess(true)
 
       setTimeout(() => {
@@ -215,30 +227,44 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Inventúra</Text>
-        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="rgba(255,255,255,0.6)" />
-        </TouchableOpacity>
+        <Image source={{ uri: "https://barovainventura.sk/logo.png" }} style={styles.logo} resizeMode="contain" />
+        <View style={styles.headerRight}>
+          <View style={styles.userInfo}>
+            <View style={styles.userInfoItem}>
+              <Text style={styles.userInfoLabel}>API ID</Text>
+              <Text style={styles.userInfoValue}>{user?.userId}</Text>
+            </View>
+            <View style={styles.userInfoItem}>
+              <Text style={styles.userInfoLabel}>ID inventúry</Text>
+              <Text style={styles.userInfoValue}>{user?.invId}</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Navigation buttons */}
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("InventoryList")}>
+        {/* Navigation buttons - each on separate row */}
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigation.navigate("InventoryList", { products: scannedProducts })}
+        >
           <View style={styles.navButtonLeft}>
             <Ionicons name="list-outline" size={20} color="rgba(255,255,255,0.6)" />
             <Text style={styles.navButtonText}>Prehľad inventúry</Text>
           </View>
           <View style={styles.navButtonRight}>
-            <Text style={styles.navButtonCount}>{scannedCount} produktov</Text>
+            <Text style={styles.navButtonCount}>{scannedProducts.length} produktov</Text>
             <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.navButton, { marginBottom: 16 }]}
-          onPress={() => navigation.navigate("MissingProducts")}
-        >
+        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
           <View style={styles.navButtonLeft}>
             <Ionicons name="alert-circle-outline" size={20} color="rgba(255,255,255,0.6)" />
             <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
@@ -267,7 +293,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
           </View>
         )}
 
-        {/* Camera */}
+        {/* Camera - full width */}
         {!product && !saveSuccess && (
           <>
             <View style={styles.cameraContainer}>
@@ -413,6 +439,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
     flexDirection: "row",
@@ -420,16 +447,42 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginTop: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#1a1a1a",
   },
-  headerTitle: {
+  logo: {
+    width: 120,
+    height: 32,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  userInfo: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  userInfoItem: {
+    alignItems: "center",
+  },
+  userInfoLabel: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 10,
+  },
+  userInfoValue: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: "600",
   },
   logoutButton: {
-    padding: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#2e2e38",
+    alignItems: "center",
+    justifyContent: "center",
   },
   scrollView: {
     flex: 1,
@@ -516,7 +569,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239,68,68,0.2)",
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 8,
   },
   errorText: {
     color: "#f87171",
@@ -530,21 +584,26 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(74,222,128,0.2)",
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 8,
   },
   successText: {
     color: "#4ade80",
     fontSize: 14,
   },
   cameraContainer: {
+    width: "100%",
     aspectRatio: 4 / 3,
     borderRadius: 8,
     overflow: "hidden",
+    marginTop: 8,
     marginBottom: 16,
     position: "relative",
   },
   camera: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    width: "100%",
+    height: "100%",
   },
   scanOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -671,7 +730,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   productContainer: {
-    flex: 1,
+    marginTop: 8,
   },
   productCard: {
     backgroundColor: "#1a1a1a",
@@ -683,38 +742,38 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   productIcon: {
-    width: 64,
-    height: 64,
-    backgroundColor: "#2e2e38",
+    width: 56,
+    height: 56,
     borderRadius: 8,
-    justifyContent: "center",
+    backgroundColor: "#2e2e38",
     alignItems: "center",
+    justifyContent: "center",
   },
   productIconText: {
-    fontSize: 32,
+    fontSize: 24,
   },
   productInfo: {
     flex: 1,
   },
   productTitleRow: {
     flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
   productName: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     flex: 1,
   },
   productAlcohol: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 14,
-  },
-  productEan: {
     color: "rgba(255,255,255,0.5)",
     fontSize: 12,
-    marginTop: 4,
+  },
+  productEan: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+    marginTop: 2,
   },
   productMeta: {
     flexDirection: "row",
@@ -723,8 +782,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   productVolume: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 14,
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
   },
   productQuantity: {
     color: "#fff",
@@ -736,6 +795,9 @@ const styles = StyleSheet.create({
   },
   quantitySection: {
     marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#2e2e38",
   },
   quantityLabel: {
     color: "rgba(255,255,255,0.6)",
@@ -745,34 +807,36 @@ const styles = StyleSheet.create({
   quantityControls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "center",
+    gap: 16,
   },
   quantityButton: {
     width: 48,
     height: 48,
-    backgroundColor: "#2e2e38",
     borderRadius: 8,
-    justifyContent: "center",
+    backgroundColor: "#2e2e38",
     alignItems: "center",
+    justifyContent: "center",
   },
   quantityInputContainer: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#2e2e38",
     borderRadius: 8,
-    height: 48,
     paddingHorizontal: 16,
+    minWidth: 100,
   },
   quantityInput: {
     flex: 1,
+    height: 48,
+    fontSize: 24,
+    fontWeight: "bold",
     color: "#fff",
-    fontSize: 20,
-    fontWeight: "600",
   },
   quantityUnit: {
     color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
+    fontSize: 16,
+    marginLeft: 4,
   },
   saveButton: {
     height: 48,
@@ -785,6 +849,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 })
