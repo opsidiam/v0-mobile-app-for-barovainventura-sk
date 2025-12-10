@@ -11,8 +11,12 @@ import {
   StatusBar,
   Dimensions,
   Image,
+  TextInput,
+  Platform,
+  StyleSheet,
+  ScrollView,
 } from "react-native"
-import { useCameraPermissions } from "expo-camera"
+import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RouteProp } from "@react-navigation/native"
 import type { RootStackParamList } from "../../App"
@@ -50,8 +54,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
   useEffect(() => {
     fetchMissingCount()
-    const interval = setInterval(fetchMissingCount, 5000)
-    return () => clearInterval(interval)
   }, [])
 
   async function fetchMissingCount() {
@@ -154,6 +156,8 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       setSaveSuccess(true)
       Vibration.vibrate(100)
 
+      fetchMissingCount()
+
       setTimeout(() => {
         resetScanner()
       }, 1500)
@@ -230,6 +234,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
+      {/* Header */}
       <View style={styles.header}>
         <Image source={{ uri: LOGO_URL }} style={styles.headerLogo} resizeMode="contain" />
 
@@ -249,52 +254,120 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
             <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
         </View>
-
-      {/* Added camera container and scan overlay */}
-      <View style={styles.cameraContainer}>
-        {/* Camera component would go here */}
-      </View>
-      <View style={styles.scanOverlay}>
-        <View style={styles.scanFrame} />
       </View>
 
-      {/* Added manual input container */}
-      <View style={styles.manualInputContainer}>
-        <Text style={styles.manualInputLabel}>Zadajte EAN manuálne</Text>
-        <View style={styles.manualInputRow}>
-          <TextInput
-            style={styles.manualInput}
-            value={manualEan}
-            onChangeText={setManualEan}
-            placeholder="EAN kód"
-            keyboardType="numeric"
-          />
-          <TouchableOpacity style={styles.manualButton} onPress={() => handleEanSubmit(manualEan)}>
-            <Text style={styles.manualButtonText}>Skenovať</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {!product && (
+          <>
+            {/* Navigation Buttons */}
+            <View style={styles.navButtons}>
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={() => navigation.navigate("InventoryList", { products: scannedProducts })}
+              >
+                <View style={styles.navButtonContent}>
+                  <Ionicons name="list-outline" size={20} color="#fff" />
+                  <Text style={styles.navButtonText}>Prehľad inventúry</Text>
+                </View>
+                <View style={styles.navBadgeContainer}>
+                  {scannedProducts.length > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{scannedProducts.length}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+                </View>
+              </TouchableOpacity>
 
-      {/* Added product card */}
-      {product && (
-        <View style={styles.productCard}>
-          <View style={styles.productHeader}>
-            <Text style={styles.productName}>{product.name}</Text>
-            {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
-          </View>
-          <View style={styles.productDetails}>
-            {product.volume && (
-              <View style={styles.productDetailRow}>
-                <Text style={styles.productDetailLabel}>Objem</Text>
-                <Text style={styles.productDetailValue}>{product.volume} l</Text>
+              <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
+                <View style={styles.navButtonContent}>
+                  <Ionicons name="alert-circle-outline" size={20} color="#fff" />
+                  <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
+                </View>
+                <View style={styles.navBadgeContainer}>
+                  {missingCount > 0 && (
+                    <View style={[styles.badge, styles.badgeRed]}>
+                      <Text style={styles.badgeText}>{missingCount}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Camera */}
+            {cameraActive ? (
+              <View style={styles.cameraContainer}>
+                <CameraView
+                  style={styles.camera}
+                  onBarcodeScanned={handleBarCodeScanned}
+                  barcodeScannerSettings={{
+                    barcodeTypes: ["ean8", "ean13"],
+                  }}
+                />
+                <View style={styles.scanOverlay}>
+                  <View style={styles.scanFrame} />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.cameraContainer}>
+                <View style={styles.cameraPlaceholder}>
+                  <ActivityIndicator color="#fff" size="large" />
+                  <Text style={styles.cameraPlaceholderText}>Spracovávam...</Text>
+                </View>
               </View>
             )}
-            {product.alcohol_content && (
-              <View style={styles.productDetailRow}>
-                <Text style={styles.productDetailLabel}>Alkoholový obsah</Text>
-                <Text style={styles.productDetailValue}>{product.alcohol_content}%</Text>
+
+            {/* Manual EAN Input */}
+            <View style={styles.manualInputContainer}>
+              <Text style={styles.manualInputLabel}>Zadajte EAN manuálne</Text>
+              <View style={styles.manualInputRow}>
+                <TextInput
+                  style={styles.manualInput}
+                  value={manualEan}
+                  onChangeText={setManualEan}
+                  placeholder="EAN kód"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity style={styles.manualButton} onPress={() => handleEanSubmit(manualEan)}>
+                  <Ionicons name="search-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Product Detail Card */}
+        {product && (
+          <View style={styles.productCard}>
+            {saveSuccess && (
+              <View style={styles.successBanner}>
+                <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
+                <Text style={styles.successText}>Produkt bol úspešne uložený!</Text>
               </View>
             )}
+
+            <View style={styles.productHeader}>
+              <Text style={styles.productName}>{product.name}</Text>
+              {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
+            </View>
+
+            <View style={styles.productDetails}>
+              {product.volume && (
+                <View style={styles.productDetailRow}>
+                  <Text style={styles.productDetailLabel}>Objem</Text>
+                  <Text style={styles.productDetailValue}>{product.volume} l</Text>
+                </View>
+              )}
+              {product.alcohol_content && (
+                <View style={styles.productDetailRow}>
+                  <Text style={styles.productDetailLabel}>Alkoholový obsah</Text>
+                  <Text style={styles.productDetailValue}>{product.alcohol_content}%</Text>
+                </View>
+              )}
+            </View>
+
             <View style={styles.quantitySection}>
               <Text style={styles.quantityLabel}>Počet na sklade</Text>
               <View style={styles.quantityControls}>
@@ -312,50 +385,54 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
                 </TouchableOpacity>
               </View>
             </View>
+
             <View style={styles.productActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={resetScanner}>
+              <TouchableOpacity style={styles.cancelButton} onPress={resetScanner} disabled={saving}>
                 <Text style={styles.cancelButtonText}>Zrušiť</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Uložiť</Text>
+              <TouchableOpacity
+                style={[styles.saveButton, saving && styles.buttonDisabled]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Uložiť</Text>}
               </TouchableOpacity>
             </View>
           </View>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={24} color="#f87171" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Status Badge */}
+      {!product && (
+        <View
+          style={[
+            styles.statusBadge,
+            loading ? styles.statusLoading : error ? styles.statusError : styles.statusNormal,
+          ]}
+        >
+          <Text style={styles.statusText}>{scanStatus}</Text>
         </View>
       )}
-
-      {/* Added error container */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={24} color="#f87171" />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {/* Added success banner */}
-      {saveSuccess && (
-        <View style={styles.successBanner}>
-          <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
-          <Text style={styles.successText}>Produkt bol úspešne uložený!</Text>
-        </View>
-      )}
-
-      {/* Added status badge */}
-      <View style={[styles.statusBadge, loading ? styles.statusLoading : error ? styles.statusError : styles.statusNormal]}>
-        <Text style={styles.statusText}>{scanStatus}</Text>
-      </View>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,\
-    backgroundColor: "#000\",\
+    flex: 1,
+    backgroundColor: "#000",
   },
   header: {
     flexDirection: "row",
-    alignItems: "center\",\
+    alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 15 : 15,
@@ -365,31 +442,31 @@ const styles = StyleSheet.create({
   headerLogo: {
     width: 120,
     height: 35,
-  },\
+  },
   headerRight: {
     flexDirection: "row",
-    alignItems: "center\",\
+    alignItems: "center",
     gap: 12,
   },
   userInfo: {
     flexDirection: "row",
     gap: 16,
-  },\
+  },
   infoItem: {
     alignItems: "center",
   },
-  infoLabel: {\
+  infoLabel: {
     fontSize: 10,
-    color: \"rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.5)",
   },
   infoValue: {
     fontSize: 12,
-    fontWeight: "600",\
+    fontWeight: "600",
     color: "#fff",
   },
   logoutButton: {
     width: 32,
-    height: 32,\
+    height: 32,
     borderRadius: 8,
     backgroundColor: "#2e2e38",
     alignItems: "center",
@@ -398,17 +475,17 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  scrollContent: {\
-    padding: 16,\
+  scrollContent: {
+    padding: 16,
     paddingBottom: 32,
   },
   navButtons: {
     gap: 8,
     marginBottom: 16,
-  },\
+  },
   navButton: {
     flexDirection: "row",
-    alignItems: "center\",\
+    alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
@@ -416,20 +493,20 @@ const styles = StyleSheet.create({
   },
   navButtonContent: {
     flexDirection: "row",
-    alignItems: "center\",\
+    alignItems: "center",
     gap: 12,
   },
   navButtonText: {
     fontSize: 16,
     color: "#fff",
-  },\
+  },
   navBadgeContainer: {
     flexDirection: "row",
-    alignItems: "center\",\
+    alignItems: "center",
     gap: 8,
   },
   badge: {
-    backgroundColor: "#3a3a44",\
+    backgroundColor: "#3a3a44",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
@@ -439,13 +516,13 @@ const styles = StyleSheet.create({
   badgeRed: {
     backgroundColor: "#ef4444",
   },
-  badgeText: {\
+  badgeText: {
     fontSize: 12,
-    color: "#fff",\
+    color: "#fff",
     fontWeight: "600",
   },
   cameraContainer: {
-    width: SCREEN_WIDTH - 32,\
+    width: SCREEN_WIDTH - 32,
     aspectRatio: 4 / 3,
     borderRadius: 16,
     overflow: "hidden",
@@ -456,9 +533,9 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
-  scanOverlay: {\
-    flex: 1,
-    alignItems: "center\",\
+  scanOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
     justifyContent: "center",
   },
   scanFrame: {
@@ -507,7 +584,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239,68,68,0.2)",
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginTop: 16,
   },
   errorText: {
     color: "#f87171",
@@ -614,6 +691,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  quantityButtonText: {
+    fontSize: 24,
+    color: "#fff",
+    fontWeight: "600",
+  },
   quantityInput: {
     width: 80,
     height: 48,
@@ -623,10 +705,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
-  },
-  quantityUnit: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.6)",
   },
   productActions: {
     flexDirection: "row",
@@ -653,7 +731,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.5,
   },
   saveButtonText: {
     color: "#fff",
