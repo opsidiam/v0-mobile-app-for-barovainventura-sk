@@ -269,17 +269,19 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       {saveSuccess && (
         <View style={styles.successPopup}>
           <View style={styles.successContainer}>
-            <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+            <Ionicons name="checkmark-circle" size={24} color="#fff" />
             <Text style={styles.successText}>Produkt bol úspešne uložený!</Text>
           </View>
         </View>
       )}
 
-      {/* Error Message */}
+      {/* Error Popup */}
       {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={24} color="#f87171" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.errorPopup}>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={24} color="#fff" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
         </View>
       )}
 
@@ -748,22 +750,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(239,68,68,0.2)",
-    padding: 12,
-    borderRadius: 8,
-    position: "absolute",
-    bottom: 16,
-    left: 16,
-    right: 16,
+    backgroundColor: "rgba(239,68,68,0.9)",
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   errorText: {
-    color: "#f87171",
-    fontSize: 14,
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
     flex: 1,
   },
   successPopup: {
     position: "absolute",
-    bottom: 20,
+    bottom: 40,
     left: 16,
     right: 16,
     zIndex: 1000,
@@ -772,7 +776,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(34,197,94,0.95)",
+    backgroundColor: "rgba(34, 197, 94, 0.9)",
     padding: 16,
     borderRadius: 12,
     shadowColor: "#000",
@@ -786,5 +790,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     flex: 1,
+  },
+  errorPopup: {
+    position: "absolute",
+    bottom: 40,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(239, 68, 68, 0.9)",
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 })
