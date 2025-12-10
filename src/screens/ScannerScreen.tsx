@@ -104,25 +104,18 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       const result = await api.getProductByEan(ean)
       console.log("[v0] API response:", result)
 
-      if (result.product_found) {
+      if (result.product_found && result.product_found !== null) {
         const foundProduct = Array.isArray(result.product_found) ? result.product_found[0] : result.product_found
         setProduct(foundProduct)
         const serverQuantity = foundProduct.quantity_on_stock
         setQuantity(serverQuantity && serverQuantity !== "0" ? serverQuantity : "0")
         Vibration.vibrate(100)
         setScanStatus("Produkt nájdený!")
-      } else if (result.product_not_found) {
-        console.log("[v0] Product not found:", ean)
+      } else {
+        // Product not found - either product_not_found is present or product_found is null/missing
         setError("Produkt neexistuje. Pre vytvorenie produktu použite PC aplikáciu.")
         setScanStatus("Produkt neexistuje")
         Vibration.vibrate([0, 200, 100, 200])
-        setTimeout(() => {
-          resetScanner()
-        }, 3000)
-      } else {
-        console.log("[v0] Unexpected API response format")
-        setError("Neočakávaná odpoveď zo servera.")
-        setScanStatus("Chyba")
         setTimeout(() => {
           resetScanner()
         }, 3000)
@@ -252,7 +245,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         <View style={styles.headerRight}>
           <View style={styles.userInfo}>
             <Text style={styles.userInfoLabel}>
-              API ID: <Text style={styles.userInfoValue}>{user?.userId || "-"}</Text>
+              Meno: <Text style={styles.userInfoValue}>{user?.userName || "-"}</Text>
             </Text>
             <Text style={styles.userInfoLabel}>
               ID inventúry: <Text style={styles.userInfoValue}>{user?.invId || "-"}</Text>
@@ -534,9 +527,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cameraContainer: {
-    width: SCREEN_WIDTH - 32,
-    height: (SCREEN_WIDTH - 32) * 0.75,
-    borderRadius: 12,
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH * 0.75,
+    borderRadius: 0,
     overflow: "hidden",
     marginBottom: 16,
     position: "relative",
@@ -797,18 +790,5 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     zIndex: 1000,
-  },
-  errorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(239, 68, 68, 0.9)",
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
 })

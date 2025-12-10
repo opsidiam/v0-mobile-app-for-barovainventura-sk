@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   SafeAreaView,
+  StatusBar,
+  Platform,
 } from "react-native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../../App"
@@ -58,12 +60,15 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
   function renderItem({ item }: { item: Product }) {
     return (
       <View style={styles.itemContainer}>
+        <View style={styles.itemIcon}>
+          <Text style={styles.itemIconText}>📦</Text>
+        </View>
         <View style={styles.itemInfo}>
           <Text style={styles.itemName}>{item.name}</Text>
           <Text style={styles.itemEan}>{item.ean}</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={() => handleAddProduct(item.ean || "")}>
-          <Ionicons name="add" size={24} color="#fff" />
+          <Ionicons name="add" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     )
@@ -81,30 +86,24 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.navHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Nenaskenované produkty</Text>
-        <View style={styles.backButton} />
-      </View>
-
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
       <View style={styles.header}>
-        {products.length > 0 ? (
-          <View style={styles.headerWithBadge}>
-            <Text style={styles.headerText}>Chýbajúce produkty:</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{products.length}</Text>
-            </View>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.backText}>Nazad</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>Nenaskenované produkty</Text>
+        {products.length > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{products.length}</Text>
           </View>
-        ) : (
-          <Text style={styles.headerText}>Všetky produkty naskenované</Text>
         )}
       </View>
-
       {products.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="checkmark-circle-outline" size={64} color="#4ade80" />
+          <Ionicons name="checkmark-circle-outline" size={64} color="rgba(74,222,128,0.6)" />
           <Text style={styles.emptyText}>Všetky produkty boli naskenované!</Text>
         </View>
       ) : (
@@ -124,45 +123,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  navHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1a1a",
+    marginTop: 15,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  navTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  header: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1a1a",
-  },
-  headerWithBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  headerText: {
+  backText: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 14,
+  },
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  title: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
   },
   badge: {
     backgroundColor: "#ef4444",
@@ -183,26 +175,38 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#1a1a1a",
     borderRadius: 8,
-    padding: 16,
+    padding: 12,
+    gap: 12,
+    marginBottom: 12,
+  },
+  itemIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: "#2e2e38",
     alignItems: "center",
+    justifyContent: "center",
+  },
+  itemIconText: {
+    fontSize: 24,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     color: "#fff",
-    marginBottom: 4,
   },
   itemEan: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 2,
   },
   addButton: {
     backgroundColor: "#2e2e38",
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
@@ -214,8 +218,9 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: "#4ade80",
+    color: "rgba(255,255,255,0.5)",
     fontSize: 16,
     marginTop: 16,
+    textAlign: "center",
   },
 })
