@@ -10,12 +10,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Image,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useAuth } from "../lib/auth-context"
-
-const LOGO_URL = "/images/v2-20alt-20-20w.png"
+import { Logo } from "../components/Logo"
 
 export function LoginScreen() {
   const [userId, setUserId] = useState("")
@@ -54,7 +52,7 @@ export function LoginScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Image source={{ uri: LOGO_URL }} style={styles.logo} resizeMode="contain" />
+          <Logo width={220} height={60} />
         </View>
 
         {/* Error message */}
@@ -135,10 +133,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: "center",
     marginBottom: 48,
-  },
-  logo: {
-    width: 220,
-    height: 60,
   },
   errorContainer: {
     flexDirection: "row",

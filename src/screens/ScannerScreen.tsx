@@ -10,7 +10,6 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
-  Image,
   TextInput,
   Platform,
   StyleSheet,
@@ -23,6 +22,7 @@ import type { RootStackParamList } from "../../App"
 import { api, type Product } from "../lib/api"
 import { useAuth } from "../lib/auth-context"
 import { Ionicons } from "@expo/vector-icons"
+import { Logo } from "../components/Logo"
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
 const LOGO_URL = "/images/v2-20alt-20-20w.png"
@@ -236,17 +236,13 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
       {/* Header */}
       <View style={styles.header}>
-        <Image source={{ uri: LOGO_URL }} style={styles.headerLogo} resizeMode="contain" />
+        <Logo width={120} height={35} />
 
         <View style={styles.headerRight}>
           <View style={styles.userInfo}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>API ID</Text>
-              <Text style={styles.infoValue}>{user?.userId || "-"}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>ID inventúry</Text>
-              <Text style={styles.infoValue}>{user?.invId || "-"}</Text>
+            <View style={styles.userInfoText}>
+              <Text style={styles.userInfoValue}>{user?.userId || "-"}</Text>
+              <Text style={styles.userInfoValue}>{user?.invId || "-"}</Text>
             </View>
           </View>
 
@@ -256,7 +252,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.contentScrollView} contentContainerStyle={styles.contentInner}>
         {!product && (
           <>
             {/* Navigation Buttons */}
@@ -267,9 +263,9 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               >
                 <View style={styles.navButtonContent}>
                   <Ionicons name="list-outline" size={20} color="#fff" />
-                  <Text style={styles.navButtonText}>Prehľad inventúry</Text>
+                  <Text style={styles.navButtonTitle}>Prehľad inventúry</Text>
                 </View>
-                <View style={styles.navBadgeContainer}>
+                <View style={styles.navButtonContent}>
                   {scannedProducts.length > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{scannedProducts.length}</Text>
@@ -282,9 +278,9 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
                 <View style={styles.navButtonContent}>
                   <Ionicons name="alert-circle-outline" size={20} color="#fff" />
-                  <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
+                  <Text style={styles.navButtonTitle}>Nenaskenované produkty</Text>
                 </View>
-                <View style={styles.navBadgeContainer}>
+                <View style={styles.navButtonContent}>
                   {missingCount > 0 && (
                     <View style={[styles.badge, styles.badgeRed]}>
                       <Text style={styles.badgeText}>{missingCount}</Text>
@@ -305,9 +301,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
                     barcodeTypes: ["ean8", "ean13"],
                   }}
                 />
-                <View style={styles.scanOverlay}>
-                  <View style={styles.scanFrame} />
-                </View>
+                <View style={styles.scanFrame} />
               </View>
             ) : (
               <View style={styles.cameraContainer}>
@@ -330,7 +324,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
                   placeholderTextColor="rgba(255,255,255,0.3)"
                   keyboardType="numeric"
                 />
-                <TouchableOpacity style={styles.manualButton} onPress={() => handleEanSubmit(manualEan)}>
+                <TouchableOpacity style={styles.manualInputButton} onPress={() => handleEanSubmit(manualEan)}>
                   <Ionicons name="search-outline" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -348,12 +342,15 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               </View>
             )}
 
-            <View style={styles.productHeader}>
-              <Text style={styles.productName}>{product.name}</Text>
-              {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
+            <View style={styles.productCardHeader}>
+              <Text style={styles.productCardTitle}>{product.name}</Text>
+              {product.brand && <Text style={styles.productCardEan}>{product.brand}</Text>}
+              <TouchableOpacity style={styles.closeButton} onPress={resetScanner}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.productDetails}>
+            <View style={styles.productCardBody}>
               {product.volume && (
                 <View style={styles.productDetailRow}>
                   <Text style={styles.productDetailLabel}>Objem</Text>
@@ -386,16 +383,20 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               </View>
             </View>
 
-            <View style={styles.productActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={resetScanner} disabled={saving}>
-                <Text style={styles.cancelButtonText}>Zrušiť</Text>
+            <View style={styles.productCardActions}>
+              <TouchableOpacity
+                style={[styles.productCardButton, styles.cancelButton]}
+                onPress={resetScanner}
+                disabled={saving}
+              >
+                <Text style={styles.buttonText}>Zrušiť</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.saveButton, saving && styles.buttonDisabled]}
+                style={[styles.productCardButton, styles.saveButton, saving && styles.buttonDisabled]}
                 onPress={handleSave}
                 disabled={saving}
               >
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Uložiť</Text>}
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Uložiť</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -415,7 +416,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         <View
           style={[
             styles.statusBadge,
-            loading ? styles.statusLoading : error ? styles.statusError : styles.statusNormal,
+            loading ? styles.statusBadgeScanning : error ? styles.statusBadgeError : styles.statusBadgeVerifying,
           ]}
         >
           <Text style={styles.statusText}>{scanStatus}</Text>
@@ -437,11 +438,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 15 : 15,
     paddingBottom: 12,
-    backgroundColor: "#000",
-  },
-  headerLogo: {
-    width: 120,
-    height: 35,
+    backgroundColor: "#1a1a1a",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2e2e38",
   },
   headerRight: {
     flexDirection: "row",
@@ -449,306 +448,134 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   userInfo: {
-    flexDirection: "row",
-    gap: 16,
+    alignItems: "flex-end",
   },
-  infoItem: {
-    alignItems: "center",
+  userInfoText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
   },
-  infoLabel: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.5)",
-  },
-  infoValue: {
-    fontSize: 12,
-    fontWeight: "600",
+  userInfoValue: {
+    fontSize: 13,
     color: "#fff",
+    fontWeight: "600",
   },
   logoutButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#2e2e38",
-    alignItems: "center",
-    justifyContent: "center",
+    padding: 8,
   },
-  scrollView: {
+  contentScrollView: {
     flex: 1,
   },
-  scrollContent: {
+  contentInner: {
     padding: 16,
-    paddingBottom: 32,
   },
   navButtons: {
-    gap: 8,
+    flexDirection: "row",
+    gap: 12,
     marginBottom: 16,
   },
   navButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#1a1a1a",
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2e2e38",
   },
   navButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    flex: 1,
   },
-  navButtonText: {
-    fontSize: 16,
+  navButtonTitle: {
     color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
   },
-  navBadgeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  navButtonCount: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
   },
   badge: {
-    backgroundColor: "#3a3a44",
+    backgroundColor: "#ef4444",
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     minWidth: 24,
     alignItems: "center",
   },
-  badgeRed: {
-    backgroundColor: "#ef4444",
-  },
   badgeText: {
-    fontSize: 12,
     color: "#fff",
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
   },
   cameraContainer: {
     width: SCREEN_WIDTH - 32,
-    aspectRatio: 4 / 3,
-    borderRadius: 16,
+    height: (SCREEN_WIDTH - 32) * 0.75,
+    borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#1a1a1a",
     marginBottom: 16,
-    alignSelf: "center",
+    position: "relative",
   },
   camera: {
     flex: 1,
   },
-  scanOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   scanFrame: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
     width: 250,
     height: 150,
+    marginLeft: -125,
+    marginTop: -75,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.5)",
+    borderColor: "#fff",
     borderRadius: 12,
-  },
-  cameraPlaceholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  cameraPlaceholderText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
   },
   statusBadge: {
     position: "absolute",
-    bottom: 12,
-    alignSelf: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statusNormal: {
+    top: 16,
+    left: 16,
+    right: 16,
     backgroundColor: "rgba(0,0,0,0.7)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  statusLoading: {
-    backgroundColor: "rgba(59,130,246,0.8)",
+  statusBadgeScanning: {
+    backgroundColor: "rgba(34,197,94,0.9)",
   },
-  statusError: {
-    backgroundColor: "rgba(239,68,68,0.8)",
+  statusBadgeVerifying: {
+    backgroundColor: "rgba(59,130,246,0.9)",
+  },
+  statusBadgeError: {
+    backgroundColor: "rgba(239,68,68,0.9)",
   },
   statusText: {
     color: "#fff",
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  errorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(239,68,68,0.2)",
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  errorText: {
-    color: "#f87171",
-    fontSize: 14,
-    flex: 1,
-  },
-  manualInputContainer: {
-    marginBottom: 16,
-  },
-  manualInputLabel: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.7)",
-    marginBottom: 8,
-  },
-  manualInputRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  manualInput: {
-    flex: 1,
-    height: 48,
-    backgroundColor: "#2e2e38",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: "#fff",
-  },
-  manualButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: "#3a3a44",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  productCard: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 16,
-    padding: 16,
-  },
-  successBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "rgba(34,197,94,0.2)",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  successText: {
-    color: "#22c55e",
     fontSize: 14,
     fontWeight: "600",
-  },
-  productHeader: {
-    marginBottom: 16,
-  },
-  productName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  productBrand: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 4,
-  },
-  productDetails: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  productDetailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  productDetailLabel: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
-  },
-  productDetailValue: {
-    fontSize: 14,
-    color: "#fff",
-  },
-  quantitySection: {
-    marginBottom: 16,
-  },
-  quantityLabel: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.7)",
-    marginBottom: 8,
-  },
-  quantityControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  quantityButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: "#3a3a44",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quantityButtonText: {
-    fontSize: 24,
-    color: "#fff",
-    fontWeight: "600",
-  },
-  quantityInput: {
-    width: 80,
-    height: 48,
-    backgroundColor: "#2e2e38",
-    borderRadius: 8,
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  productActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  cancelButton: {
     flex: 1,
-    height: 48,
-    backgroundColor: "#2e2e38",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelButtonText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  saveButton: {
-    flex: 1,
-    height: 48,
-    backgroundColor: "#22c55e",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
   },
   permissionContainer: {
-    flex: 1,
-    alignItems: "center",
+    width: SCREEN_WIDTH - 32,
+    height: (SCREEN_WIDTH - 32) * 0.75,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
     justifyContent: "center",
+    alignItems: "center",
     padding: 24,
-    gap: 16,
+    marginBottom: 16,
   },
   permissionText: {
-    fontSize: 16,
     color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
     textAlign: "center",
+    marginBottom: 16,
   },
   permissionButton: {
     backgroundColor: "#3a3a44",
@@ -758,7 +585,134 @@ const styles = StyleSheet.create({
   },
   permissionButtonText: {
     color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  manualInputContainer: {
+    backgroundColor: "#1a1a1a",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  manualInputLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  manualInputRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  manualInput: {
+    flex: 1,
+    height: 44,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: "#fff",
+    fontSize: 14,
+  },
+  manualInputButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: "#3a3a44",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  productCard: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  productCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  productCardTitle: {
+    flex: 1,
+    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+    marginBottom: 4,
+  },
+  productCardEan: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  productCardBody: {
+    gap: 16,
+  },
+  quantitySection: {
+    gap: 8,
+  },
+  quantityLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+  },
+  quantityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  quantityButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  quantityInput: {
+    flex: 1,
+    height: 44,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  productCardActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  productCardButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#2e2e38",
+  },
+  saveButton: {
+    backgroundColor: "#3a3a44",
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(239,68,68,0.2)",
+    padding: 12,
+    borderRadius: 8,
+  },
+  errorText: {
+    color: "#f87171",
+    fontSize: 14,
+    flex: 1,
   },
 })

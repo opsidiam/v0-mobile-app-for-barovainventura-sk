@@ -14,7 +14,7 @@ cd barova-inventura
 
 3. Nainštalujte závislosti:
 \`\`\`bash
-npx expo install expo-camera expo-crypto expo-secure-store @react-navigation/native @react-navigation/native-stack react-native-screens react-native-safe-area-context @expo/vector-icons
+npx expo install expo-camera expo-crypto expo-secure-store @react-navigation/native @react-navigation/native-stack react-native-screens react-native-safe-area-context @expo/vector-icons react-native-svg
 \`\`\`
 
 4. Pre iOS:
@@ -40,12 +40,13 @@ npx expo run:ios
 /
 ├── App.tsx                    # Hlavný vstupný bod s navigáciou
 ├── src/
+│   ├── components/
+│   │   └── Logo.tsx          # SVG Logo komponenta
 │   ├── lib/
 │   │   ├── api.ts            # API klient (SHA256 hashovanie hesla)
 │   │   └── auth-context.tsx  # Autentifikácia context
 │   └── screens/
 │       ├── LoginScreen.tsx        # Prihlasovacia obrazovka
-│       ├── HomeScreen.tsx         # Domovská obrazovka
 │       ├── ScannerScreen.tsx      # Skenovanie EAN kódov
 │       ├── InventoryListScreen.tsx    # Prehľad inventúry
 │       └── MissingProductsScreen.tsx  # Nenaskenované produkty
@@ -57,8 +58,8 @@ npx expo run:ios
 - **Manuálne zadanie EAN** - Možnosť zadať EAN ručne
 - **Bezpečné uloženie tokenu** - Pomocou expo-secure-store
 - **SHA256 hashovanie hesla** - Pomocou expo-crypto
-- **Auto-refresh** - Nenaskenované produkty sa aktualizujú každých 5 sekúnd
-- **Pull-to-refresh** - Na všetkých zoznamoch
+- **SVG Logo** - Natívna SVG komponenta pomocou react-native-svg
+- **Auto-refresh missing products** - Po prihlásení a po uložení produktu
 
 ## API
 
