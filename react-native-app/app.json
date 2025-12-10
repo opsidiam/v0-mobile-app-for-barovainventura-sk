@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Barová Inventúra",
+    "slug": "barova-inventura",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "sk.barovainventura.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Aplikácia potrebuje prístup ku kamere na skenovanie čiarových kódov."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "sk.barovainventura.app",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Aplikácia potrebuje prístup ku kamere na skenovanie čiarových kódov."
+        }
+      ]
+    ]
+  }
+}
