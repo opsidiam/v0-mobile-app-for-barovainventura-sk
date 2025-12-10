@@ -14,7 +14,7 @@ cd barova-inventura
 
 3. Nainštalujte závislosti:
 \`\`\`bash
-npx expo install expo-camera expo-secure-store @react-navigation/native @react-navigation/native-stack react-native-screens react-native-safe-area-context @expo/vector-icons
+npx expo install expo-barcode-scanner expo-secure-store @react-navigation/native @react-navigation/native-stack react-native-screens react-native-safe-area-context @expo/vector-icons
 \`\`\`
 
 4. Pre iOS:
