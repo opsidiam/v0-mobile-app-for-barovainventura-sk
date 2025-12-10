@@ -36,7 +36,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   const [error, setError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [scanStatus, setScanStatus] = useState<string>("Namierte na EAN kód")
-  const [scanned, setScanned] = useState(false)
+  const [cameraActive, setCameraActive] = useState(true)
   const [missingCount, setMissingCount] = useState(0)
   const [scannedCount, setScannedCount] = useState(0)
 
@@ -44,7 +44,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   const scanCountRef = useRef(0)
   const isProcessingRef = useRef(false)
 
-  // Fetch missing count
   useEffect(() => {
     fetchMissingCount()
     const interval = setInterval(fetchMissingCount, 5000)
@@ -60,14 +59,12 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     }
   }
 
-  // Handle pending EAN from navigation
   useEffect(() => {
     if (route.params?.pendingEan) {
       handleEanSubmit(route.params.pendingEan)
     }
   }, [route.params?.pendingEan])
 
-  // Clear error after 5s
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => setError(null), 5000)
@@ -78,6 +75,10 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
   async function handleEanSubmit(ean: string) {
     if (!ean || ean.length < 8) {
       setError("Zadajte platný EAN kód (8 alebo 13 číslic)")
+      setTimeout(() => {
+        setCameraActive(true)
+        isProcessingRef.current = false
+      }, 1500)
       return
     }
 
@@ -86,6 +87,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     setError(null)
     setSaveSuccess(false)
     setCurrentEan(ean)
+    setCameraActive(false)
 
     try {
       const result = await api.getProductByEan(ean)
@@ -96,13 +98,21 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         const serverQuantity = foundProduct.quantity_on_stock
         setQuantity(serverQuantity && serverQuantity !== "0" ? serverQuantity : "0")
         Vibration.vibrate(100)
+        setScanStatus("Produkt nájdený!")
       } else if (result.product_not_found) {
         setError(`Produkt s EAN ${ean} nebol nájdený v databáze.`)
-        resetScanner()
+        setScanStatus("Produkt neexistuje")
+        Vibration.vibrate([0, 200, 100, 200])
+        setTimeout(() => {
+          resetScanner()
+        }, 3000)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vyhľadávanie zlyhalo")
-      resetScanner()
+      setScanStatus("Chyba vyhľadávania")
+      setTimeout(() => {
+        resetScanner()
+      }, 3000)
     } finally {
       setLoading(false)
     }
@@ -141,15 +151,16 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     setCurrentEan("")
     setQuantity("0")
     setManualEan("")
+    setError(null)
     lastScannedRef.current = null
     scanCountRef.current = 0
     setScanStatus("Namierte na EAN kód")
-    setScanned(false)
+    setCameraActive(true)
     isProcessingRef.current = false
   }
 
   function handleBarCodeScanned({ data }: { data: string }) {
-    if (isProcessingRef.current || product || scanned || loading) return
+    if (isProcessingRef.current || product || !cameraActive || loading) return
 
     if (!/^(\d{8}|\d{13})$/.test(data)) {
       return
@@ -161,9 +172,12 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
       if (scanCountRef.current >= 2) {
         isProcessingRef.current = true
-        setScanned(true)
+        setCameraActive(false)
         setScanStatus(`EAN ${data} overený!`)
-        handleEanSubmit(data)
+        Vibration.vibrate(50)
+        setTimeout(() => {
+          handleEanSubmit(data)
+        }, 300)
       }
     } else {
       lastScannedRef.current = data
@@ -248,7 +262,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
             <CameraView
               style={styles.camera}
               facing="back"
-              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              onBarcodeScanned={cameraActive && !loading ? handleBarCodeScanned : undefined}
               barcodeScannerSettings={{
                 barcodeTypes: ["ean8", "ean13"],
               }}
@@ -262,7 +276,10 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               </View>
             </View>
             <View style={styles.scanStatusContainer}>
-              <View style={styles.scanStatusBadge}>
+              <View
+                style={[styles.scanStatusBadge, loading && styles.scanStatusLoading, error && styles.scanStatusError]}
+              >
+                {loading && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
                 <Text style={styles.scanStatusText}>{loading ? "Hľadám produkt..." : scanStatus}</Text>
               </View>
             </View>
@@ -555,6 +572,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  scanStatusLoading: {
+    backgroundColor: "rgba(59,130,246,0.8)",
+  },
+  scanStatusError: {
+    backgroundColor: "rgba(239,68,68,0.8)",
   },
   scanStatusText: {
     color: "rgba(255,255,255,0.8)",
