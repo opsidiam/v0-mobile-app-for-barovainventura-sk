@@ -10,9 +10,12 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useAuth } from "../lib/auth-context"
+
+const LOGO_URL = "/images/v2-20alt-20-20w.png"
 
 export function LoginScreen() {
   const [userId, setUserId] = useState("")
@@ -51,10 +54,7 @@ export function LoginScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoBarova}>BAROVÁ</Text>
-            <Text style={styles.logoInventura}>inventúra</Text>
-          </View>
+          <Image source={{ uri: LOGO_URL }} style={styles.logo} resizeMode="contain" />
         </View>
 
         {/* Error message */}
@@ -71,12 +71,13 @@ export function LoginScreen() {
             <Text style={styles.label}>API ID:</Text>
             <TextInput
               style={styles.input}
-              placeholder="123 456"
+              placeholder="123456"
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={userId}
-              onChangeText={setUserId}
+              onChangeText={(text) => setUserId(text.replace(/[^0-9]/g, ""))}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="numeric"
             />
           </View>
 
@@ -135,20 +136,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 48,
   },
-  logoBox: {
-    alignItems: "center",
-  },
-  logoBarova: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: 4,
-  },
-  logoInventura: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 6,
-    marginTop: 2,
+  logo: {
+    width: 220,
+    height: 60,
   },
   errorContainer: {
     flexDirection: "row",

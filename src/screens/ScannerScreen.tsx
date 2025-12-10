@@ -14,6 +14,7 @@ import {
   StatusBar,
   Platform,
   Dimensions,
+  Image,
 } from "react-native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
@@ -24,6 +25,7 @@ import { useAuth } from "../lib/auth-context"
 import { Ionicons } from "@expo/vector-icons"
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
+const LOGO_URL = "/images/v2-20alt-20-20w.png"
 
 type ScannerScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Scanner">
@@ -232,10 +234,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       <View style={styles.header}>
-        <View style={styles.logoBox}>
-          <Text style={styles.logoBarova}>BAROVÁ</Text>
-          <Text style={styles.logoInventura}>inventúra</Text>
-        </View>
+        <Image source={{ uri: LOGO_URL }} style={styles.headerLogo} resizeMode="contain" />
 
         <View style={styles.headerRight}>
           <View style={styles.userInfo}>
@@ -451,23 +450,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 + 15 : 15,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 15 : 15,
     paddingBottom: 12,
     backgroundColor: "#000",
   },
-  logoBox: {
-    alignItems: "flex-start",
-  },
-  logoBarova: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: 2,
-  },
-  logoInventura: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 3,
+  headerLogo: {
+    width: 120,
+    height: 35,
   },
   headerRight: {
     flexDirection: "row",
