@@ -324,6 +324,17 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               </View>
             )}
 
+            {!product && scanStatus && (
+              <View
+                style={[
+                  styles.statusBadge,
+                  loading ? styles.statusBadgeScanning : error ? styles.statusBadgeError : styles.statusBadgeVerifying,
+                ]}
+              >
+                <Text style={styles.statusText}>{scanStatus}</Text>
+              </View>
+            )}
+
             {/* Manual EAN Input */}
             <View style={styles.manualInputContainer}>
               <Text style={styles.manualInputLabel}>Zadajte EAN manuálne</Text>
@@ -424,18 +435,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
           </View>
         )}
       </ScrollView>
-
-      {/* Status Badge */}
-      {!product && (
-        <View
-          style={[
-            styles.statusBadge,
-            loading ? styles.statusBadgeScanning : error ? styles.statusBadgeError : styles.statusBadgeVerifying,
-          ]}
-        >
-          <Text style={styles.statusText}>{scanStatus}</Text>
-        </View>
-      )}
     </SafeAreaView>
   )
 }
@@ -556,16 +555,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusBadge: {
-    position: "absolute",
-    top: 100,
-    left: 16,
-    right: 16,
+    marginBottom: 16,
     backgroundColor: "rgba(0,0,0,0.7)",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   statusBadgeScanning: {
