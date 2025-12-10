@@ -100,7 +100,9 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     setCameraActive(false)
 
     try {
+      console.log("[v0] Calling API getProductByEan for:", ean)
       const result = await api.getProductByEan(ean)
+      console.log("[v0] API response:", result)
 
       if (result.product_found) {
         const foundProduct = Array.isArray(result.product_found) ? result.product_found[0] : result.product_found
@@ -110,14 +112,23 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         Vibration.vibrate(100)
         setScanStatus("Produkt nájdený!")
       } else if (result.product_not_found) {
+        console.log("[v0] Product not found:", ean)
         setError(`Produkt s EAN ${ean} nebol nájdený v databáze.`)
         setScanStatus("Produkt neexistuje")
         Vibration.vibrate([0, 200, 100, 200])
         setTimeout(() => {
           resetScanner()
         }, 3000)
+      } else {
+        console.log("[v0] Unexpected API response format")
+        setError("Neočakávaná odpoveď zo servera.")
+        setScanStatus("Chyba")
+        setTimeout(() => {
+          resetScanner()
+        }, 3000)
       }
     } catch (err) {
+      console.log("[v0] API error:", err)
       setError(err instanceof Error ? err.message : "Vyhľadávanie zlyhalo")
       setScanStatus("Chyba vyhľadávania")
       setTimeout(() => {
@@ -344,8 +355,10 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
             )}
 
             <View style={styles.productCardHeader}>
-              <Text style={styles.productCardTitle}>{product.name}</Text>
-              {product.brand && <Text style={styles.productCardEan}>{product.brand}</Text>}
+              <View style={styles.productCardInfo}>
+                <Text style={styles.productCardTitle}>{product.name}</Text>
+                {product.brand && <Text style={styles.productCardBrand}>{product.brand}</Text>}
+              </View>
               <TouchableOpacity style={styles.closeButton} onPress={resetScanner}>
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
@@ -544,7 +557,7 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     position: "absolute",
-    top: 16,
+    top: 100,
     left: 16,
     right: 16,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -641,30 +654,48 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 16,
   },
-  productCardTitle: {
+  productCardInfo: {
     flex: 1,
+    marginRight: 8,
+  },
+  productCardTitle: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     marginBottom: 4,
   },
-  productCardEan: {
+  productCardBrand: {
     color: "rgba(255,255,255,0.5)",
-    fontSize: 12,
+    fontSize: 14,
   },
   closeButton: {
     padding: 4,
-    marginLeft: 8,
   },
   productCardBody: {
-    gap: 16,
+    gap: 12,
+    marginBottom: 16,
+  },
+  productDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  productDetailLabel: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+  productDetailValue: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
   },
   quantitySection: {
-    gap: 8,
+    marginBottom: 16,
   },
   quantityLabel: {
     color: "rgba(255,255,255,0.7)",
-    fontSize: 12,
+    fontSize: 14,
+    marginBottom: 8,
   },
   quantityControls: {
     flexDirection: "row",
@@ -672,12 +703,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quantityButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     backgroundColor: "#2e2e38",
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+  },
+  quantityButtonText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "600",
   },
   quantityInput: {
     flex: 1,
@@ -686,7 +722,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     textAlign: "center",
   },
   productCardActions: {
@@ -695,7 +731,7 @@ const styles = StyleSheet.create({
   },
   productCardButton: {
     flex: 1,
-    height: 44,
+    height: 48,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
@@ -708,7 +744,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
   },
   errorContainer: {
