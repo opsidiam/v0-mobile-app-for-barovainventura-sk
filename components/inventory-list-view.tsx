@@ -1,7 +1,7 @@
 "use client"
-
 import { ArrowLeft, X } from "lucide-react"
 import type { ScannedProduct } from "./app-shell"
+import { useAuth } from "@/lib/auth-context"
 
 interface InventoryListViewProps {
   products: ScannedProduct[]
@@ -11,6 +11,7 @@ interface InventoryListViewProps {
 }
 
 export function InventoryListView({ products, onBack, onRemoveProduct, onComplete }: InventoryListViewProps) {
+  const { token } = useAuth()
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })
   }
@@ -34,6 +35,11 @@ export function InventoryListView({ products, onBack, onRemoveProduct, onComplet
           </button>
         )}
 
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Prehľad inventúry</h2>
+          <span className="text-sm text-white/50">{products.length} produktov</span>
+        </div>
+
         {/* Product list */}
         {products.length === 0 ? (
           <div className="rounded-lg bg-[#1a1a1a] p-8 text-center">
@@ -49,7 +55,7 @@ export function InventoryListView({ products, onBack, onRemoveProduct, onComplet
                     <span className="text-xl">🍾</span>
                   </div>
 
-                  {/* Product info - presne podľa PDF layoutu */}
+                  {/* Product info */}
                   <div className="flex-1 space-y-1">
                     <div className="flex items-start justify-between">
                       <div>
