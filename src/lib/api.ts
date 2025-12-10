@@ -117,11 +117,11 @@ class ApiClient {
 
   async getMissingProducts(): Promise<Product[]> {
     console.log("[v0] API getMissingProducts called, token:", this.token ? "exists" : "missing")
-    const result = await this.request<Product[]>("/product/get-missing-products", {
+    const result = await this.request<{ missing_products: Product[]; total: number }>("/product/get-missing-products", {
       method: "GET",
     })
     console.log("[v0] API getMissingProducts result:", JSON.stringify(result))
-    return result
+    return result.missing_products || []
   }
 
   async updateProduct(data: Omit<UpdateProductData, "weight">): Promise<{ scan_id: string }> {
