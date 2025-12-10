@@ -12,7 +12,7 @@ import {
   ScrollView,
   Vibration,
 } from "react-native"
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera"
+import { Camera, CameraType, type BarCodeScanningResult } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RouteProp } from "@react-navigation/native"
 import type { RootStackParamList } from "../../App"
@@ -25,13 +25,14 @@ type ScannerScreenProps = {
 }
 
 export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
-  const [permission, requestPermission] = useCameraPermissions()
+  const [permission, requestPermission] = Camera.useCameraPermissions()
   const [manualEan, setManualEan] = useState("")
   const [product, setProduct] = useState<Product | null>(null)
   const [quantity, setQuantity] = useState("0")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scanStatus, setScanStatus] = useState<"scanning" | "verifying" | "found">("scanning")
+  const [scanned, setScanned] = useState(false)
 
   const lastScannedRef = useRef<string | null>(null)
   const scanCountRef = useRef(0)
@@ -59,6 +60,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       Vibration.vibrate(100)
     } catch (error) {
       Alert.alert("Chyba", "Produkt nebol nájdený")
+      setScanned(false)
     } finally {
       setLoading(false)
     }
@@ -77,6 +79,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       lastScannedRef.current = null
       scanCountRef.current = 0
       setScanStatus("scanning")
+      setScanned(false)
     } catch (error) {
       Alert.alert("Chyba", "Nepodarilo sa uložiť produkt")
     } finally {
@@ -84,12 +87,11 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     }
   }
 
-  function handleBarCodeScanned(result: BarcodeScanningResult) {
-    if (isProcessingRef.current || product) return
+  function handleBarCodeScanned({ type, data }: BarCodeScanningResult) {
+    if (isProcessingRef.current || product || scanned) return
 
-    const scannedData = result.data
+    const scannedData = data
 
-    // Validate EAN format (8 or 13 digits)
     if (!/^(\d{8}|\d{13})$/.test(scannedData)) {
       return
     }
@@ -100,6 +102,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
       if (scanCountRef.current >= 2) {
         isProcessingRef.current = true
+        setScanned(true)
         setScanStatus("found")
         handleEanSubmit(scannedData).finally(() => {
           isProcessingRef.current = false
@@ -125,6 +128,7 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     lastScannedRef.current = null
     scanCountRef.current = 0
     setScanStatus("scanning")
+    setScanned(false)
   }
 
   if (!permission) {
@@ -149,16 +153,15 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Camera View */}
       {!product && (
         <View style={styles.cameraContainer}>
-          <CameraView
+          <Camera
             style={styles.camera}
-            facing="back"
-            barcodeScannerSettings={{
-              barcodeTypes: ["ean8", "ean13"],
+            type={CameraType.back}
+            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barCodeScannerSettings={{
+              barCodeTypes: ["ean8", "ean13"],
             }}
-            onBarcodeScanned={handleBarCodeScanned}
           />
           <View style={styles.scanOverlay}>
             <View style={styles.scanFrame} />
@@ -173,7 +176,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         </View>
       )}
 
-      {/* Manual EAN Input */}
       {!product && (
         <View style={styles.manualInputContainer}>
           <Text style={styles.sectionTitle}>Alebo zadajte EAN manuálne</Text>
@@ -202,7 +204,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         </View>
       )}
 
-      {/* Product Detail */}
       {product && (
         <View style={styles.productContainer}>
           <View style={styles.productHeader}>
