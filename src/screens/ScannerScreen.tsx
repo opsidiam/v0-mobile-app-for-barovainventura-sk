@@ -58,10 +58,14 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
   async function fetchMissingCount() {
     try {
+      console.log("[v0] Fetching missing products count...")
       const missing = await api.getMissingProducts()
-      setMissingCount(Array.isArray(missing) ? missing.length : 0)
+      console.log("[v0] Missing products response:", JSON.stringify(missing))
+      const count = Array.isArray(missing) ? missing.length : 0
+      console.log("[v0] Missing count:", count)
+      setMissingCount(count)
     } catch (error) {
-      console.error("Failed to fetch missing count:", error)
+      console.error("[v0] Failed to fetch missing count:", error)
     }
   }
 

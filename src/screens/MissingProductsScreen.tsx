@@ -25,10 +25,12 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
 
   async function fetchMissingProducts() {
     try {
+      console.log("[v0] Fetching missing products list...")
       const data = await api.getMissingProducts()
+      console.log("[v0] Missing products data:", JSON.stringify(data))
       setProducts(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error("Failed to fetch missing products:", error)
+      console.error("[v0] Failed to fetch missing products:", error)
     } finally {
       setLoading(false)
       setRefreshing(false)

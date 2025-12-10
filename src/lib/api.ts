@@ -116,9 +116,12 @@ class ApiClient {
   }
 
   async getMissingProducts(): Promise<Product[]> {
-    return this.request("/product/get-missing-products", {
+    console.log("[v0] API getMissingProducts called, token:", this.token ? "exists" : "missing")
+    const result = await this.request<Product[]>("/product/get-missing-products", {
       method: "GET",
     })
+    console.log("[v0] API getMissingProducts result:", JSON.stringify(result))
+    return result
   }
 
   async updateProduct(data: Omit<UpdateProductData, "weight">): Promise<{ scan_id: string }> {
