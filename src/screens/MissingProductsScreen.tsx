@@ -1,7 +1,16 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from "react-native"
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  SafeAreaView,
+} from "react-native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../../App"
 import { api, type Product } from "../lib/api"
@@ -62,14 +71,24 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.navHeader}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.navTitle}>Nenaskenované produkty</Text>
+        <View style={styles.backButton} />
+      </View>
+
       <View style={styles.header}>
         {products.length > 0 ? (
           <View style={styles.headerWithBadge}>
@@ -97,7 +116,7 @@ export function MissingProductsScreen({ navigation }: MissingProductsScreenProps
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
         />
       )}
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -110,7 +129,26 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000",
+  },
+  navHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a1a1a",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  navTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
   },
   header: {
     padding: 16,
