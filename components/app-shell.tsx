@@ -6,8 +6,9 @@ import { InventoryStartView } from "./inventory-start-view"
 import { ScannerView } from "./scanner-view"
 import { InventoryListView } from "./inventory-list-view"
 import { InventoryCompleteView } from "./inventory-complete-view"
+import { MissingProductsView } from "./missing-products-view"
 
-export type AppView = "start" | "scanner" | "list" | "complete"
+export type AppView = "start" | "scanner" | "list" | "missing" | "complete"
 
 export interface ScannedProduct {
   ean: string
@@ -20,9 +21,14 @@ export interface ScannedProduct {
   scannedAt: Date
 }
 
+interface AppShellState {
+  pendingEan?: string
+}
+
 export function AppShell() {
   const [activeView, setActiveView] = useState<AppView>("start")
   const [scannedProducts, setScannedProducts] = useState<ScannedProduct[]>([])
+  const [pendingEan, setPendingEan] = useState<string | undefined>()
 
   const handleAddProduct = (product: ScannedProduct) => {
     setScannedProducts((prev) => {
@@ -49,6 +55,15 @@ export function AppShell() {
     setActiveView("start")
   }
 
+  const handleManualAddProduct = (ean: string) => {
+    setPendingEan(ean)
+    setActiveView("scanner")
+  }
+
+  const handlePendingEanProcessed = () => {
+    setPendingEan(undefined)
+  }
+
   const renderView = () => {
     switch (activeView) {
       case "start":
@@ -58,7 +73,10 @@ export function AppShell() {
           <ScannerView
             onProductScanned={handleAddProduct}
             onViewList={() => setActiveView("list")}
+            onViewMissingProducts={() => setActiveView("missing")}
             scannedCount={scannedProducts.length}
+            pendingEan={pendingEan}
+            onPendingEanProcessed={handlePendingEanProcessed}
           />
         )
       case "list":
@@ -68,7 +86,12 @@ export function AppShell() {
             onBack={() => setActiveView("scanner")}
             onRemoveProduct={handleRemoveProduct}
             onComplete={handleCompleteInventory}
+            onManualAddProduct={handleManualAddProduct}
           />
+        )
+      case "missing":
+        return (
+          <MissingProductsView onBack={() => setActiveView("scanner")} onManualAddProduct={handleManualAddProduct} />
         )
       case "complete":
         return <InventoryCompleteView onNewInventory={handleNewInventory} />

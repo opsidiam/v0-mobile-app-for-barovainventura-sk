@@ -1,18 +1,29 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { getProductByEan, updateProduct, type Product } from "@/lib/api"
-import { AlertCircle, Camera, Check, Loader2, X, Plus, Minus, List } from "lucide-react"
+import { getProductByEan, updateProduct, getMissingProducts, type Product } from "@/lib/api"
+import { AlertCircle, Camera, Check, Loader2, X, Plus, Minus, List, ChevronRight, CameraOff } from "lucide-react"
 import type { ScannedProduct } from "./app-shell"
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 
 interface ScannerViewProps {
   onProductScanned: (product: ScannedProduct) => void
   onViewList: () => void
+  onViewMissingProducts: () => void
   scannedCount: number
+  pendingEan?: string
+  onPendingEanProcessed?: () => void
 }
 
-export function ScannerView({ onProductScanned, onViewList, scannedCount }: ScannerViewProps) {
+export function ScannerView({
+  onProductScanned,
+  onViewList,
+  onViewMissingProducts,
+  scannedCount,
+  pendingEan,
+  onPendingEanProcessed,
+}: ScannerViewProps) {
   const { token } = useAuth()
   const [ean, setEan] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -24,6 +35,117 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
   const inputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cameraActive, setCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [missingCount, setMissingCount] = useState(0)
+
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null)
+  const lastScannedRef = useRef<string | null>(null)
+  const scanCountRef = useRef<number>(0)
+  const [scanningStatus, setScanningStatus] = useState<string>("")
+
+  const isValidEan = (code: string): boolean => {
+    const cleaned = code.replace(/\s/g, "")
+    return /^\d{8}$/.test(cleaned) || /^\d{13}$/.test(cleaned)
+  }
+
+  const startCamera = useCallback(async () => {
+    try {
+      setCameraError(null)
+
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+      ])
+
+      const codeReader = new BrowserMultiFormatReader(hints)
+      codeReaderRef.current = codeReader
+
+      const videoInputDevices = await codeReader.listVideoInputDevices()
+
+      if (videoInputDevices.length === 0) {
+        setCameraError("Nebola nájdená žiadna kamera")
+        return
+      }
+
+      // Prefer back camera
+      const backCamera = videoInputDevices.find(
+        (device) => device.label.toLowerCase().includes("back") || device.label.toLowerCase().includes("rear"),
+      )
+      const selectedDeviceId = backCamera?.deviceId || videoInputDevices[0].deviceId
+
+      setCameraActive(true)
+      setScanningStatus("Hľadám EAN kód...")
+
+      await codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current!, (result, err) => {
+        if (result) {
+          const scannedCode = result.getText()
+
+          if (isValidEan(scannedCode)) {
+            if (lastScannedRef.current === scannedCode) {
+              scanCountRef.current += 1
+
+              if (scanCountRef.current >= 2) {
+                // Verified - same code scanned twice
+                setScanningStatus(`EAN ${scannedCode} overený!`)
+
+                // Reset for next scan
+                lastScannedRef.current = null
+                scanCountRef.current = 0
+
+                // Auto-submit
+                setEan(scannedCode)
+                handleSearchWithEan(scannedCode)
+              }
+            } else {
+              // First scan of this code
+              lastScannedRef.current = scannedCode
+              scanCountRef.current = 1
+              setScanningStatus(`Overujem ${scannedCode}...`)
+            }
+          }
+        }
+      })
+    } catch (err) {
+      console.error("Camera error:", err)
+      setCameraError("Nepodarilo sa spustiť kameru. Skontrolujte povolenia.")
+      setCameraActive(false)
+    }
+  }, [])
+
+  const stopCamera = useCallback(() => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset()
+      codeReaderRef.current = null
+    }
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach((track) => track.stop())
+      videoRef.current.srcObject = null
+    }
+    setCameraActive(false)
+    setScanningStatus("")
+    lastScannedRef.current = null
+    scanCountRef.current = 0
+  }, [])
+
+  useEffect(() => {
+    if (!product && !saveSuccess) {
+      startCamera()
+    }
+
+    return () => {
+      stopCamera()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!product && !saveSuccess && !cameraActive) {
+      startCamera()
+    }
+  }, [product, saveSuccess])
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -36,53 +158,62 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
     }
   }, [error])
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        setCameraActive(true)
+  useEffect(() => {
+    if (pendingEan && token) {
+      setEan(pendingEan)
+      handleSearchWithEan(pendingEan)
+      onPendingEanProcessed?.()
+    }
+  }, [pendingEan, token])
+
+  useEffect(() => {
+    const fetchMissingCount = async () => {
+      if (!token) return
+      try {
+        const missing = await getMissingProducts(token)
+        setMissingCount(Array.isArray(missing) ? missing.length : 0)
+      } catch (error) {
+        console.error("Failed to fetch missing products count:", error)
       }
-    } catch (err) {
-      setError("Nepodarilo sa spustiť kameru. Skontrolujte povolenia.")
     }
-  }
 
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach((track) => track.stop())
-      videoRef.current.srcObject = null
-      setCameraActive(false)
-    }
-  }
+    fetchMissingCount()
+    const interval = setInterval(fetchMissingCount, 5000)
+    return () => clearInterval(interval)
+  }, [token])
 
-  const handleSearch = async () => {
-    if (!ean.trim() || !token) return
+  const handleSearchWithEan = async (searchEan: string) => {
+    if (!searchEan.trim() || !token) return
 
     setIsLoading(true)
     setError(null)
     setProduct(null)
     setSaveSuccess(false)
 
+    stopCamera()
+
     try {
-      const result = await getProductByEan(token, ean.trim())
+      const result = await getProductByEan(token, searchEan.trim())
 
       if (result.product_found) {
         const foundProduct = Array.isArray(result.product_found) ? result.product_found[0] : result.product_found
         setProduct(foundProduct)
-        setQuantity("")
-        stopCamera() // Zastavíme kameru keď nájdeme produkt
+        const serverQuantity = foundProduct.quantity_on_stock
+        setQuantity(serverQuantity && serverQuantity !== "0" ? serverQuantity : "0")
       } else if (result.product_not_found) {
-        setError(`Produkt s EAN ${ean} nebol nájdený v databáze.`)
+        setError(`Produkt s EAN ${searchEan} nebol nájdený v databáze.`)
+        startCamera()
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vyhľadávanie zlyhalo")
+      startCamera()
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSearch = async () => {
+    await handleSearchWithEan(ean)
   }
 
   const handleSave = async () => {
@@ -117,6 +248,7 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
         setQuantity("")
         setSaveSuccess(false)
         inputRef.current?.focus()
+        startCamera()
       }, 1000)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Uloženie zlyhalo")
@@ -132,6 +264,7 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
     setQuantity("")
     setSaveSuccess(false)
     inputRef.current?.focus()
+    startCamera()
   }
 
   const adjustQuantity = (delta: number) => {
@@ -143,12 +276,35 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
   return (
     <div className="flex flex-col bg-black px-4 py-4 min-h-screen">
       <div className="mx-auto w-full max-w-lg flex flex-col flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-white">Prehľad inventúry</h2>
-          <button onClick={onViewList} className="flex items-center gap-1 text-sm text-white/60 hover:text-white">
-            <List className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          onClick={onViewList}
+          className="flex items-center justify-between w-full rounded-lg bg-[#1a1a1a] px-4 py-3 mb-2 hover:bg-[#2e2e38] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <List className="h-5 w-5 text-white/60" />
+            <span className="text-sm font-medium text-white">Prehľad inventúry</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-white/50">{scannedCount} produktov</span>
+            <ChevronRight className="h-4 w-4 text-white/40" />
+          </div>
+        </button>
+
+        <button
+          onClick={onViewMissingProducts}
+          className="flex items-center justify-between w-full rounded-lg bg-[#1a1a1a] px-4 py-3 mb-4 hover:bg-[#2e2e38] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-white/60" />
+            <span className="text-sm font-medium text-white">Nenaskenované produkty</span>
+            {missingCount > 0 && (
+              <span className="inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                {missingCount}
+              </span>
+            )}
+          </div>
+          <ChevronRight className="h-4 w-4 text-white/40" />
+        </button>
 
         {error && (
           <div className="flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-400 mb-4">
@@ -167,24 +323,53 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
 
         {!product && !saveSuccess && (
           <>
-            {/* Kamera view */}
-            <div
-              className="flex aspect-[4/3] items-center justify-center rounded-lg bg-[#1a1a1a] mb-4 overflow-hidden cursor-pointer"
-              onClick={!cameraActive ? startCamera : undefined}
-            >
-              {cameraActive ? (
-                <video ref={videoRef} autoPlay playsInline className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-white/40">
-                  <Camera className="h-12 w-12" />
-                  <span className="text-sm">Kliknite pre spustenie kamery</span>
+            <div className="relative aspect-[4/3] rounded-lg bg-[#1a1a1a] mb-4 overflow-hidden">
+              {cameraError ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 text-white/40 p-4">
+                  <CameraOff className="h-12 w-12" />
+                  <span className="text-sm text-center">{cameraError}</span>
+                  <button
+                    onClick={startCamera}
+                    className="mt-2 px-4 py-2 rounded-lg bg-[#2e2e38] text-white text-sm hover:bg-[#3a3a44]"
+                  >
+                    Skúsiť znova
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                  {/* Scanning overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    {/* Scanning frame */}
+                    <div className="w-3/4 h-1/3 border-2 border-white/50 rounded-lg relative">
+                      <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white rounded-tl-lg" />
+                      <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white rounded-tr-lg" />
+                      <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white rounded-bl-lg" />
+                      <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white rounded-br-lg" />
+                    </div>
+                  </div>
+                  {/* Status indicator */}
+                  <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+                    <div className="bg-black/70 px-3 py-1.5 rounded-full">
+                      <span className="text-xs text-white/80">
+                        {isLoading ? "Hľadám produkt..." : scanningStatus || "Namierte na EAN kód"}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Camera toggle button */}
+                  <button
+                    onClick={cameraActive ? stopCamera : startCamera}
+                    className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white/80 hover:bg-black/70"
+                  >
+                    {cameraActive ? <CameraOff className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
+                  </button>
+                </>
               )}
             </div>
 
             <div className="space-y-2 mb-4">
-              <p className="text-sm font-medium text-white">Naskenovať EAN</p>
-              <p className="text-xs text-white/50">Zadajte EAN kód produktu</p>
+              <p className="text-sm font-medium text-white">Manuálne zadanie EAN</p>
+              <p className="text-xs text-white/50">Alebo zadajte EAN kód ručne</p>
 
               <div className="relative">
                 <input
@@ -229,8 +414,8 @@ export function ScannerView({ onProductScanned, onViewList, scannedCount }: Scan
 
         {/* Produkt detail - zobrazí sa len keď je produkt nájdený */}
         {product && !saveSuccess && (
-          <div className="flex-1 flex flex-col">
-            <div className="space-y-4 rounded-lg bg-[#1a1a1a] p-4 flex-1">
+          <div className="flex flex-col">
+            <div className="space-y-4 rounded-lg bg-[#1a1a1a] p-4">
               {/* Product info card */}
               <div className="flex items-start gap-3">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-[#2e2e38]">
