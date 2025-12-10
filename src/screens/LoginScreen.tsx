@@ -50,10 +50,11 @@ export function LoginScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <View style={styles.content}>
-        {/* Logo */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>BAROVÁ</Text>
-          <Text style={styles.logoSubtext}>inventúra</Text>
+          <View style={styles.logoBox}>
+            <Text style={styles.logoBarova}>BAROVÁ</Text>
+            <Text style={styles.logoInventura}>inventúra</Text>
+          </View>
         </View>
 
         {/* Error message */}
@@ -134,16 +135,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 48,
   },
-  logoText: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#fff",
-    letterSpacing: 2,
+  logoBox: {
+    alignItems: "center",
   },
-  logoSubtext: {
-    fontSize: 18,
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 4,
+  logoBarova: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 4,
+  },
+  logoInventura: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 6,
+    marginTop: 2,
   },
   errorContainer: {
     flexDirection: "row",

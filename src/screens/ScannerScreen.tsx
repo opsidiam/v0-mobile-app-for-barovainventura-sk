@@ -11,9 +11,9 @@ import {
   ScrollView,
   Vibration,
   SafeAreaView,
-  Image,
   StatusBar,
   Platform,
+  Dimensions,
 } from "react-native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
@@ -22,6 +22,8 @@ import type { RootStackParamList, ScannedProduct } from "../../App"
 import { api, type Product } from "../lib/api"
 import { useAuth } from "../lib/auth-context"
 import { Ionicons } from "@expo/vector-icons"
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window")
 
 type ScannerScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Scanner">
@@ -147,11 +149,11 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       setScannedProducts((prev) => [...prev, newScannedProduct])
 
       setSaveSuccess(true)
+      Vibration.vibrate(100)
 
       setTimeout(() => {
         resetScanner()
-        setSaveSuccess(false)
-      }, 1000)
+      }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Uloženie zlyhalo")
     } finally {
@@ -164,63 +166,59 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
     setCurrentEan("")
     setQuantity("0")
     setManualEan("")
+    setSaveSuccess(false)
     setError(null)
-    lastScannedRef.current = null
-    scanCountRef.current = 0
     setScanStatus("Namierte na EAN kód")
     setCameraActive(true)
+    lastScannedRef.current = null
+    scanCountRef.current = 0
     isProcessingRef.current = false
   }
 
   function handleBarCodeScanned({ data }: { data: string }) {
-    if (isProcessingRef.current || product || !cameraActive || loading) return
+    if (isProcessingRef.current || !cameraActive) return
+    if (!/^\d{8}$|^\d{13}$/.test(data)) return
 
-    if (!/^(\d{8}|\d{13})$/.test(data)) {
-      return
-    }
-
-    if (lastScannedRef.current === data) {
+    if (data === lastScannedRef.current) {
       scanCountRef.current += 1
-      setScanStatus(`Overujem ${data}...`)
-
       if (scanCountRef.current >= 2) {
         isProcessingRef.current = true
         setCameraActive(false)
-        setScanStatus(`EAN ${data} overený!`)
+        setScanStatus("EAN overený, vyhľadávam...")
         Vibration.vibrate(50)
-        setTimeout(() => {
-          handleEanSubmit(data)
-        }, 300)
+        handleEanSubmit(data)
       }
     } else {
       lastScannedRef.current = data
       scanCountRef.current = 1
-      setScanStatus(`Overujem ${data}...`)
+      setScanStatus(`Overujem: ${data}`)
     }
   }
 
   function adjustQuantity(delta: number) {
-    const current = Number.parseFloat(quantity) || 0
+    const current = Number.parseInt(quantity, 10) || 0
     const newValue = Math.max(0, current + delta)
     setQuantity(newValue.toString())
   }
 
   if (!permission) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
+      <View style={styles.container}>
+        <ActivityIndicator color="#fff" size="large" />
       </View>
     )
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.permissionContainer}>
-        <Ionicons name="camera-outline" size={64} color="rgba(255,255,255,0.4)" />
-        <Text style={styles.permissionText}>Pre skenovanie EAN kódov je potrebný prístup ku kamere</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-          <Text style={styles.permissionButtonText}>Povoliť kameru</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.permissionContainer}>
+          <Ionicons name="camera-outline" size={64} color="rgba(255,255,255,0.5)" />
+          <Text style={styles.permissionText}>Pre skenovanie potrebujeme prístup ku kamere</Text>
+          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+            <Text style={styles.permissionButtonText}>Povoliť kameru</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     )
   }
@@ -230,52 +228,94 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       <View style={styles.header}>
-        <Image source={{ uri: "https://barovainventura.sk/logo.png" }} style={styles.logo} resizeMode="contain" />
+        <View style={styles.logoBox}>
+          <Text style={styles.logoBarova}>BAROVÁ</Text>
+          <Text style={styles.logoInventura}>inventúra</Text>
+        </View>
+
         <View style={styles.headerRight}>
           <View style={styles.userInfo}>
-            <View style={styles.userInfoItem}>
-              <Text style={styles.userInfoLabel}>API ID</Text>
-              <Text style={styles.userInfoValue}>{user?.userId}</Text>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>API ID</Text>
+              <Text style={styles.infoValue}>{user?.userId || "-"}</Text>
             </View>
-            <View style={styles.userInfoItem}>
-              <Text style={styles.userInfoLabel}>ID inventúry</Text>
-              <Text style={styles.userInfoValue}>{user?.invId}</Text>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>ID inventúry</Text>
+              <Text style={styles.infoValue}>{user?.invId || "-"}</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+
+          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Navigation buttons - each on separate row */}
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate("InventoryList", { products: scannedProducts })}
-        >
-          <View style={styles.navButtonLeft}>
-            <Ionicons name="list-outline" size={20} color="rgba(255,255,255,0.6)" />
-            <Text style={styles.navButtonText}>Prehľad inventúry</Text>
-          </View>
-          <View style={styles.navButtonRight}>
-            <Text style={styles.navButtonCount}>{scannedProducts.length} produktov</Text>
-            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
-          <View style={styles.navButtonLeft}>
-            <Ionicons name="alert-circle-outline" size={20} color="rgba(255,255,255,0.6)" />
-            <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
-            {missingCount > 0 && (
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Navigation buttons */}
+        <View style={styles.navButtons}>
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={() => navigation.navigate("InventoryList", { products: scannedProducts })}
+          >
+            <View style={styles.navButtonContent}>
+              <Ionicons name="list-outline" size={20} color="#fff" />
+              <Text style={styles.navButtonText}>Prehľad inventúry</Text>
+            </View>
+            <View style={styles.navBadgeContainer}>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{missingCount}</Text>
+                <Text style={styles.badgeText}>{scannedProducts.length}</Text>
               </View>
-            )}
+              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
+            <View style={styles.navButtonContent}>
+              <Ionicons name="warning-outline" size={20} color="#fff" />
+              <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
+            </View>
+            <View style={styles.navBadgeContainer}>
+              {missingCount > 0 && (
+                <View style={[styles.badge, styles.badgeRed]}>
+                  <Text style={styles.badgeText}>{missingCount}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cameraContainer}>
+          {cameraActive ? (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ["ean8", "ean13"],
+              }}
+              onBarcodeScanned={handleBarCodeScanned}
+            >
+              <View style={styles.scanOverlay}>
+                <View style={styles.scanFrame} />
+              </View>
+            </CameraView>
+          ) : (
+            <View style={styles.cameraPlaceholder}>
+              <Ionicons name="camera" size={48} color="rgba(255,255,255,0.3)" />
+              <Text style={styles.cameraPlaceholderText}>Kamera pozastavená</Text>
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.statusBadge,
+              error ? styles.statusError : loading ? styles.statusLoading : styles.statusNormal,
+            ]}
+          >
+            <Text style={styles.statusText}>{error ? "Chyba" : scanStatus}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
-        </TouchableOpacity>
+        </View>
 
         {/* Error message */}
         {error && (
@@ -285,149 +325,111 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
           </View>
         )}
 
-        {/* Success message */}
-        {saveSuccess && (
-          <View style={styles.successContainer}>
-            <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
-            <Text style={styles.successText}>Produkt uložený!</Text>
-          </View>
-        )}
-
-        {/* Camera - full width */}
-        {!product && !saveSuccess && (
-          <>
-            <View style={styles.cameraContainer}>
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                onBarcodeScanned={cameraActive && !loading ? handleBarCodeScanned : undefined}
-                barcodeScannerSettings={{
-                  barcodeTypes: ["ean8", "ean13"],
-                }}
+        {/* Manual EAN input */}
+        {!product && (
+          <View style={styles.manualInputContainer}>
+            <Text style={styles.manualInputLabel}>Alebo zadajte EAN manuálne:</Text>
+            <View style={styles.manualInputRow}>
+              <TextInput
+                style={styles.manualInput}
+                placeholder="EAN kód"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={manualEan}
+                onChangeText={setManualEan}
+                keyboardType="numeric"
+                maxLength={13}
               />
-              <View style={styles.scanOverlay}>
-                <View style={styles.scanFrame}>
-                  <View style={[styles.corner, styles.cornerTL]} />
-                  <View style={[styles.corner, styles.cornerTR]} />
-                  <View style={[styles.corner, styles.cornerBL]} />
-                  <View style={[styles.corner, styles.cornerBR]} />
-                </View>
-              </View>
-              <View style={styles.scanStatusContainer}>
-                <View
-                  style={[styles.scanStatusBadge, loading && styles.scanStatusLoading, error && styles.scanStatusError]}
-                >
-                  {loading && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
-                  <Text style={styles.scanStatusText}>{loading ? "Hľadám produkt..." : scanStatus}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Manual input */}
-            <View style={styles.manualInputContainer}>
-              <Text style={styles.sectionTitle}>Manuálne zadanie EAN</Text>
-              <Text style={styles.sectionSubtitle}>Alebo zadajte EAN kód ručne</Text>
-
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="123 456 789 1011"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  value={manualEan}
-                  onChangeText={setManualEan}
-                  keyboardType="numeric"
-                  maxLength={13}
-                />
-                {manualEan.length > 0 && (
-                  <TouchableOpacity style={styles.clearButton} onPress={() => setManualEan("")}>
-                    <Ionicons name="close" size={20} color="rgba(255,255,255,0.4)" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
               <TouchableOpacity
-                style={[styles.submitButton, (loading || !manualEan.trim()) && styles.buttonDisabled]}
+                style={[styles.manualButton, loading && styles.buttonDisabled]}
                 onPress={() => handleEanSubmit(manualEan)}
-                disabled={loading || !manualEan.trim()}
+                disabled={loading || !manualEan}
               >
                 {loading ? (
-                  <View style={styles.buttonContent}>
-                    <ActivityIndicator color="#fff" size="small" />
-                    <Text style={styles.buttonText}>Hľadám...</Text>
-                  </View>
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.buttonText}>Zadať EAN</Text>
+                  <Ionicons name="search" size={20} color="#fff" />
                 )}
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         )}
 
         {/* Product detail */}
-        {product && !saveSuccess && (
-          <View style={styles.productContainer}>
-            <View style={styles.productCard}>
-              <View style={styles.productHeader}>
-                <View style={styles.productIcon}>
-                  <Text style={styles.productIconText}>🍾</Text>
-                </View>
-                <View style={styles.productInfo}>
-                  <View style={styles.productTitleRow}>
-                    <Text style={styles.productName}>{product.name}</Text>
-                  </View>
-                  {product.alcohol_content && product.alcohol_content !== "0" && (
-                    <Text style={styles.productAlcohol}>{product.alcohol_content}%</Text>
-                  )}
-                  <Text style={styles.productEan}>{currentEan}</Text>
-                  <View style={styles.productMeta}>
-                    {product.volume && <Text style={styles.productVolume}>{product.volume}</Text>}
-                    <Text style={styles.productQuantity}>{quantity || "?"} ks</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={resetScanner} style={styles.closeButton}>
-                  <Ionicons name="close" size={24} color="#f87171" />
-                </TouchableOpacity>
+        {product && (
+          <View style={styles.productCard}>
+            {saveSuccess && (
+              <View style={styles.successBanner}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.successText}>Úspešne uložené!</Text>
               </View>
+            )}
 
-              <View style={styles.quantitySection}>
-                <Text style={styles.quantityLabel}>Počet na sklade</Text>
-                <View style={styles.quantityControls}>
-                  <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(-1)}>
-                    <Ionicons name="remove" size={24} color="#fff" />
-                  </TouchableOpacity>
+            <View style={styles.productHeader}>
+              <Text style={styles.productName}>{product.name}</Text>
+              {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
+            </View>
 
-                  <View style={styles.quantityInputContainer}>
-                    <TextInput
-                      style={styles.quantityInput}
-                      value={quantity}
-                      onChangeText={setQuantity}
-                      keyboardType="numeric"
-                      textAlign="center"
-                    />
-                    <Text style={styles.quantityUnit}>ks</Text>
-                  </View>
-
-                  <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(1)}>
-                    <Ionicons name="add" size={24} color="#fff" />
-                  </TouchableOpacity>
+            <View style={styles.productDetails}>
+              <View style={styles.productDetailRow}>
+                <Text style={styles.productDetailLabel}>EAN:</Text>
+                <Text style={styles.productDetailValue}>{currentEan}</Text>
+              </View>
+              {product.volume && (
+                <View style={styles.productDetailRow}>
+                  <Text style={styles.productDetailLabel}>Objem:</Text>
+                  <Text style={styles.productDetailValue}>{product.volume}</Text>
                 </View>
+              )}
+              {product.alcohol_content && (
+                <View style={styles.productDetailRow}>
+                  <Text style={styles.productDetailLabel}>Alkohol:</Text>
+                  <Text style={styles.productDetailValue}>{product.alcohol_content}%</Text>
+                </View>
+              )}
+              <View style={styles.productDetailRow}>
+                <Text style={styles.productDetailLabel}>Typ:</Text>
+                <Text style={styles.productDetailValue}>
+                  {product.selling_method === "rozlievane" ? "Rozlievané" : "Kusový predaj"}
+                </Text>
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.saveButton, (saving || !quantity) && styles.buttonDisabled]}
-              onPress={handleSave}
-              disabled={saving || !quantity}
-            >
-              {saving ? (
-                <View style={styles.buttonContent}>
+            <View style={styles.quantitySection}>
+              <Text style={styles.quantityLabel}>Výsledná hodnota:</Text>
+              <View style={styles.quantityControls}>
+                <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(-1)}>
+                  <Ionicons name="remove" size={24} color="#fff" />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.quantityInput}
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  keyboardType="numeric"
+                  selectTextOnFocus
+                />
+                <Text style={styles.quantityUnit}>ks</Text>
+                <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(1)}>
+                  <Ionicons name="add" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.productActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={resetScanner}>
+                <Text style={styles.cancelButtonText}>Zrušiť</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveButton, saving && styles.buttonDisabled]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                {saving ? (
                   <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.saveButtonText}>Ukladám...</Text>
-                </View>
-              ) : (
-                <Text style={styles.saveButtonText}>Uložiť</Text>
-              )}
-            </TouchableOpacity>
+                ) : (
+                  <Text style={styles.saveButtonText}>Uložiť</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -439,42 +441,50 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1a1a",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 + 15 : 15,
+    paddingBottom: 12,
+    backgroundColor: "#000",
   },
-  logo: {
-    width: 120,
-    height: 32,
+  logoBox: {
+    alignItems: "flex-start",
+  },
+  logoBarova: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 2,
+  },
+  logoInventura: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 3,
   },
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 12,
   },
   userInfo: {
     flexDirection: "row",
     gap: 16,
   },
-  userInfoItem: {
+  infoItem: {
     alignItems: "center",
   },
-  userInfoLabel: {
-    color: "rgba(255,255,255,0.5)",
+  infoLabel: {
     fontSize: 10,
+    color: "rgba(255,255,255,0.5)",
   },
-  userInfoValue: {
-    color: "#fff",
+  infoValue: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#fff",
   },
   logoutButton: {
     width: 32,
@@ -487,80 +497,107 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  contentContainer: {
+  scrollContent: {
     padding: 16,
     paddingBottom: 32,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-    backgroundColor: "#000",
-  },
-  permissionText: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 16,
-    textAlign: "center",
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  permissionButton: {
-    backgroundColor: "#2e2e38",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  permissionButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+  navButtons: {
+    gap: 8,
+    marginBottom: 16,
   },
   navButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#1a1a1a",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
+    borderRadius: 12,
+    padding: 16,
   },
-  navButtonLeft: {
+  navButtonContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  navButtonRight: {
+  navButtonText: {
+    fontSize: 16,
+    color: "#fff",
+  },
+  navBadgeContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  navButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
+  badge: {
+    backgroundColor: "#3a3a44",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 24,
+    alignItems: "center",
   },
-  navButtonCount: {
+  badgeRed: {
+    backgroundColor: "#ef4444",
+  },
+  badgeText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  cameraContainer: {
+    width: SCREEN_WIDTH - 32,
+    aspectRatio: 4 / 3,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#1a1a1a",
+    marginBottom: 16,
+    alignSelf: "center",
+  },
+  camera: {
+    flex: 1,
+  },
+  scanOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanFrame: {
+    width: 250,
+    height: 150,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.5)",
+    borderRadius: 12,
+  },
+  cameraPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  cameraPlaceholderText: {
     color: "rgba(255,255,255,0.5)",
     fontSize: 14,
   },
-  badge: {
-    backgroundColor: "#ef4444",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  statusBadge: {
+    position: "absolute",
+    bottom: 12,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  badgeText: {
+  statusNormal: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+  },
+  statusLoading: {
+    backgroundColor: "rgba(59,130,246,0.8)",
+  },
+  statusError: {
+    backgroundColor: "rgba(239,68,68,0.8)",
+  },
+  statusText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "bold",
+    fontWeight: "500",
   },
   errorContainer: {
     flexDirection: "row",
@@ -569,284 +606,178 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239,68,68,0.2)",
     padding: 12,
     borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   errorText: {
     color: "#f87171",
     fontSize: 14,
     flex: 1,
   },
-  successContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(74,222,128,0.2)",
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  successText: {
-    color: "#4ade80",
-    fontSize: 14,
-  },
-  cameraContainer: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: 8,
-    overflow: "hidden",
-    marginTop: 8,
-    marginBottom: 16,
-    position: "relative",
-  },
-  camera: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
-  },
-  scanOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scanFrame: {
-    width: "75%",
-    height: "33%",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.5)",
-    borderRadius: 8,
-    position: "relative",
-  },
-  corner: {
-    position: "absolute",
-    width: 16,
-    height: 16,
-    borderColor: "#fff",
-  },
-  cornerTL: {
-    top: -2,
-    left: -2,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-    borderTopLeftRadius: 8,
-  },
-  cornerTR: {
-    top: -2,
-    right: -2,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-    borderTopRightRadius: 8,
-  },
-  cornerBL: {
-    bottom: -2,
-    left: -2,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    borderBottomLeftRadius: 8,
-  },
-  cornerBR: {
-    bottom: -2,
-    right: -2,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderBottomRightRadius: 8,
-  },
-  scanStatusContainer: {
-    position: "absolute",
-    bottom: 12,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  scanStatusBadge: {
-    backgroundColor: "rgba(0,0,0,0.7)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  scanStatusLoading: {
-    backgroundColor: "rgba(59,130,246,0.8)",
-  },
-  scanStatusError: {
-    backgroundColor: "rgba(239,68,68,0.8)",
-  },
-  scanStatusText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12,
-  },
   manualInputContainer: {
     marginBottom: 16,
   },
-  sectionTitle: {
-    color: "#fff",
+  manualInputLabel: {
     fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 12,
-    marginBottom: 12,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#2e2e38",
-    borderRadius: 8,
+    color: "rgba(255,255,255,0.7)",
     marginBottom: 8,
   },
-  input: {
+  manualInputRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  manualInput: {
     flex: 1,
     height: 48,
+    backgroundColor: "#2e2e38",
+    borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
     color: "#fff",
-    textAlign: "center",
   },
-  clearButton: {
-    padding: 12,
-  },
-  submitButton: {
+  manualButton: {
+    width: 48,
     height: 48,
-    backgroundColor: "#2e2e38",
+    backgroundColor: "#3a3a44",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  productContainer: {
-    marginTop: 8,
   },
   productCard: {
     backgroundColor: "#1a1a1a",
-    borderRadius: 8,
+    borderRadius: 16,
     padding: 16,
   },
-  productHeader: {
+  successBanner: {
     flexDirection: "row",
-    gap: 12,
-  },
-  productIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: "#2e2e38",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(34,197,94,0.2)",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
   },
-  productIconText: {
-    fontSize: 24,
+  successText: {
+    color: "#22c55e",
+    fontSize: 14,
+    fontWeight: "600",
   },
-  productInfo: {
-    flex: 1,
-  },
-  productTitleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+  productHeader: {
+    marginBottom: 16,
   },
   productName: {
+    fontSize: 20,
+    fontWeight: "bold",
     color: "#fff",
+  },
+  productBrand: {
     fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
-  },
-  productAlcohol: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 12,
-  },
-  productEan: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  productMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    color: "rgba(255,255,255,0.6)",
     marginTop: 4,
   },
-  productVolume: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 12,
+  productDetails: {
+    gap: 8,
+    marginBottom: 16,
   },
-  productQuantity: {
-    color: "#fff",
+  productDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  productDetailLabel: {
     fontSize: 14,
-    fontWeight: "600",
+    color: "rgba(255,255,255,0.6)",
   },
-  closeButton: {
-    padding: 4,
+  productDetailValue: {
+    fontSize: 14,
+    color: "#fff",
   },
   quantitySection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#2e2e38",
+    marginBottom: 16,
   },
   quantityLabel: {
-    color: "rgba(255,255,255,0.6)",
     fontSize: 14,
-    marginBottom: 12,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 8,
   },
   quantityControls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
+    gap: 12,
   },
   quantityButton: {
     width: 48,
     height: 48,
+    backgroundColor: "#3a3a44",
     borderRadius: 8,
-    backgroundColor: "#2e2e38",
     alignItems: "center",
     justifyContent: "center",
   },
-  quantityInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  quantityInput: {
+    width: 80,
+    height: 48,
     backgroundColor: "#2e2e38",
     borderRadius: 8,
-    paddingHorizontal: 16,
-    minWidth: 100,
-  },
-  quantityInput: {
-    flex: 1,
-    height: 48,
-    fontSize: 24,
+    textAlign: "center",
+    fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
   },
   quantityUnit: {
-    color: "rgba(255,255,255,0.5)",
     fontSize: 16,
-    marginLeft: 4,
+    color: "rgba(255,255,255,0.6)",
   },
-  saveButton: {
+  productActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
     height: 48,
     backgroundColor: "#2e2e38",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 16,
+  },
+  cancelButtonText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+  saveButton: {
+    flex: 1,
+    height: 48,
+    backgroundColor: "#22c55e",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   saveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  permissionContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 16,
+  },
+  permissionText: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+  },
+  permissionButton: {
+    backgroundColor: "#3a3a44",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  permissionButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
