@@ -240,10 +240,12 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
         <View style={styles.headerRight}>
           <View style={styles.userInfo}>
-            <View style={styles.userInfoText}>
-              <Text style={styles.userInfoValue}>{user?.userId || "-"}</Text>
-              <Text style={styles.userInfoValue}>{user?.invId || "-"}</Text>
-            </View>
+            <Text style={styles.userInfoLabel}>
+              API ID: <Text style={styles.userInfoValue}>{user?.userId || "-"}</Text>
+            </Text>
+            <Text style={styles.userInfoLabel}>
+              ID inventúry: <Text style={styles.userInfoValue}>{user?.invId || "-"}</Text>
+            </Text>
           </View>
 
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
@@ -255,17 +257,16 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
       <ScrollView style={styles.contentScrollView} contentContainerStyle={styles.contentInner}>
         {!product && (
           <>
-            {/* Navigation Buttons */}
             <View style={styles.navButtons}>
               <TouchableOpacity
                 style={styles.navButton}
                 onPress={() => navigation.navigate("InventoryList", { products: scannedProducts })}
               >
-                <View style={styles.navButtonContent}>
+                <View style={styles.navButtonLeft}>
                   <Ionicons name="list-outline" size={20} color="#fff" />
                   <Text style={styles.navButtonTitle}>Prehľad inventúry</Text>
                 </View>
-                <View style={styles.navButtonContent}>
+                <View style={styles.navButtonRight}>
                   {scannedProducts.length > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{scannedProducts.length}</Text>
@@ -276,11 +277,11 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
-                <View style={styles.navButtonContent}>
+                <View style={styles.navButtonLeft}>
                   <Ionicons name="alert-circle-outline" size={20} color="#fff" />
                   <Text style={styles.navButtonTitle}>Nenaskenované produkty</Text>
                 </View>
-                <View style={styles.navButtonContent}>
+                <View style={styles.navButtonRight}>
                   {missingCount > 0 && (
                     <View style={[styles.badge, styles.badgeRed]}>
                       <Text style={styles.badgeText}>{missingCount}</Text>
@@ -450,12 +451,12 @@ const styles = StyleSheet.create({
   userInfo: {
     alignItems: "flex-end",
   },
-  userInfoText: {
+  userInfoLabel: {
     fontSize: 11,
     color: "rgba(255,255,255,0.6)",
   },
   userInfoValue: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#fff",
     fontWeight: "600",
   },
@@ -469,12 +470,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   navButtons: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 12,
     marginBottom: 16,
   },
   navButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -484,31 +484,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2e2e38",
   },
-  navButtonContent: {
-    flex: 1,
+  navButtonLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  navButtonRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   navButtonTitle: {
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
-    marginBottom: 4,
   },
   navButtonCount: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 12,
   },
   badge: {
-    backgroundColor: "#ef4444",
+    backgroundColor: "#3b82f6",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     minWidth: 24,
     alignItems: "center",
   },
+  badgeRed: {
+    backgroundColor: "#ef4444",
+  },
   badgeText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   cameraContainer: {
     width: SCREEN_WIDTH - 32,
