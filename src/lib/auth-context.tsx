@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import * as SecureStore from "expo-secure-store"
+import { AppState, type AppStateStatus } from "react-native"
 import { api } from "./api"
 
 interface User {
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const TOKEN_KEY = "auth_token"
 const USER_KEY = "user_data"
+const TOKEN_EXPIRY_KEY = "token_expiry"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -37,15 +39,83 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadToken()
   }, [])
 
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const interval = setInterval(
+      async () => {
+        await refreshToken()
+      },
+      5 * 60 * 1000,
+    ) // 5 minutes
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange)
+
+    return () => {
+      clearInterval(interval)
+      subscription.remove()
+    }
+  }, [isAuthenticated])
+
+  async function handleAppStateChange(nextAppState: AppStateStatus) {
+    if (nextAppState === "active" && isAuthenticated) {
+      const isExpired = await checkTokenExpiration()
+      if (isExpired) {
+        await logout()
+      } else {
+        await refreshToken()
+      }
+    }
+  }
+
+  async function checkTokenExpiration(): Promise<boolean> {
+    try {
+      const expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY)
+      if (!expiryStr) return true
+
+      const expiry = Number.parseInt(expiryStr, 10)
+      const now = Date.now()
+      return now > expiry
+    } catch (error) {
+      return true
+    }
+  }
+
+  async function refreshToken() {
+    try {
+      const newToken = await api.refreshToken()
+      await saveToken(newToken)
+      api.setToken(newToken)
+      setToken(newToken)
+    } catch (error) {
+      console.error("Failed to refresh token:", error)
+      await logout()
+    }
+  }
+
+  async function saveToken(token: string) {
+    const expiry = Date.now() + 5 * 60 * 1000 // 5 minutes
+    await SecureStore.setItemAsync(TOKEN_KEY, token)
+    await SecureStore.setItemAsync(TOKEN_EXPIRY_KEY, expiry.toString())
+  }
+
   async function loadToken() {
     try {
       const savedToken = await SecureStore.getItemAsync(TOKEN_KEY)
       const savedUser = await SecureStore.getItemAsync(USER_KEY)
+
       if (savedToken && savedUser) {
-        api.setToken(savedToken)
-        setToken(savedToken)
-        setUser(JSON.parse(savedUser))
-        setIsAuthenticated(true)
+        const isExpired = await checkTokenExpiration()
+        if (isExpired) {
+          await SecureStore.deleteItemAsync(TOKEN_KEY)
+          await SecureStore.deleteItemAsync(USER_KEY)
+          await SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY)
+        } else {
+          api.setToken(savedToken)
+          setToken(savedToken)
+          setUser(JSON.parse(savedUser))
+          setIsAuthenticated(true)
+        }
       }
     } catch (error) {
       console.error("Failed to load token:", error)
@@ -66,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       newsColor: response.news_color,
     }
 
-    await SecureStore.setItemAsync(TOKEN_KEY, response.token)
+    await saveToken(response.token)
     await SecureStore.setItemAsync(USER_KEY, JSON.stringify(userData))
     api.setToken(response.token)
     setToken(response.token)
@@ -82,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await SecureStore.deleteItemAsync(TOKEN_KEY)
     await SecureStore.deleteItemAsync(USER_KEY)
+    await SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY)
     api.setToken(null)
     setToken(null)
     setUser(null)

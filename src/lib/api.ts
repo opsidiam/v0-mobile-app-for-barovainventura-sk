@@ -12,6 +12,14 @@ export interface LoginResponse {
   news_color?: string
 }
 
+export interface RefreshTokenResponse {
+  status: "success"
+  authorisation: {
+    token: string
+    type: string
+  }
+}
+
 export interface Product {
   name: string
   brand: string
@@ -59,6 +67,7 @@ async function sha256(message: string): Promise<string> {
 
 class ApiClient {
   private token: string | null = null
+  private tokenExpire: number | null = null
 
   setToken(token: string | null) {
     this.token = token
@@ -66,6 +75,14 @@ class ApiClient {
 
   getToken(): string | null {
     return this.token
+  }
+
+  setTokenExpire(expire: number | null) {
+    this.tokenExpire = expire
+  }
+
+  getTokenExpire(): number | null {
+    return this.tokenExpire
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -95,13 +112,26 @@ class ApiClient {
   async login(userId: string, password: string): Promise<LoginResponse> {
     const hashedPassword = await sha256(password)
 
-    return this.request("/auth/login", {
+    const loginResponse = await this.request<LoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify({
         user_id: userId,
         password: hashedPassword,
       }),
     })
+
+    this.setToken(loginResponse.token)
+    this.setTokenExpire(loginResponse.token_expire)
+
+    return loginResponse
+  }
+
+  async refreshToken(): Promise<string> {
+    const response = await this.request<RefreshTokenResponse>("/auth/refresh", {
+      method: "POST",
+    })
+    this.setToken(response.authorisation.token)
+    return response.authorisation.token
   }
 
   async logout(): Promise<void> {

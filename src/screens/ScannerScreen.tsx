@@ -265,7 +265,25 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         </View>
       </View>
 
-      <ScrollView style={styles.contentScrollView} contentContainerStyle={styles.contentInner}>
+      {/* Success Popup */}
+      {saveSuccess && (
+        <View style={styles.successPopup}>
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+            <Text style={styles.successText}>Produkt bol úspešne uložený!</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={24} color="#f87171" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
         {!product && (
           <>
             <View style={styles.navButtons}>
@@ -358,13 +376,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
         {/* Product Detail Card */}
         {product && (
           <View style={styles.productCard}>
-            {saveSuccess && (
-              <View style={styles.successBanner}>
-                <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
-                <Text style={styles.successText}>Produkt bol úspešne uložený!</Text>
-              </View>
-            )}
-
             <View style={styles.productCardHeader}>
               <View style={styles.productCardInfo}>
                 <Text style={styles.productCardTitle}>{product.name}</Text>
@@ -426,14 +437,6 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
             </View>
           </View>
         )}
-
-        {/* Error Message */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={24} color="#f87171" />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -475,11 +478,8 @@ const styles = StyleSheet.create({
   logoutButton: {
     padding: 8,
   },
-  contentScrollView: {
+  content: {
     flex: 1,
-  },
-  contentInner: {
-    padding: 16,
   },
   navButtons: {
     flexDirection: "column",
@@ -751,10 +751,40 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239,68,68,0.2)",
     padding: 12,
     borderRadius: 8,
+    position: "absolute",
+    bottom: 16,
+    left: 16,
+    right: 16,
   },
   errorText: {
     color: "#f87171",
     fontSize: 14,
+    flex: 1,
+  },
+  successPopup: {
+    position: "absolute",
+    bottom: 20,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+  },
+  successContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(34,197,94,0.95)",
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  successText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
     flex: 1,
   },
 })
