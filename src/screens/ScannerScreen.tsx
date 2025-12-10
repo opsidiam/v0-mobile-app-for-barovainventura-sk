@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Vibration,
+  SafeAreaView,
 } from "react-native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
@@ -25,7 +26,7 @@ type ScannerScreenProps = {
 }
 
 export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
-  const { token } = useAuth()
+  const { token, logout } = useAuth()
   const [permission, requestPermission] = useCameraPermissions()
   const [manualEan, setManualEan] = useState("")
   const [product, setProduct] = useState<Product | null>(null)
@@ -202,197 +203,209 @@ export function ScannerScreen({ navigation, route }: ScannerScreenProps) {
 
   if (!permission.granted) {
     return (
-      <View style={styles.permissionContainer}>
+      <SafeAreaView style={styles.permissionContainer}>
         <Ionicons name="camera-outline" size={64} color="rgba(255,255,255,0.4)" />
         <Text style={styles.permissionText}>Pre skenovanie EAN kódov je potrebný prístup ku kamere</Text>
         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
           <Text style={styles.permissionButtonText}>Povoliť kameru</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Navigation buttons */}
-      <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("InventoryList")}>
-        <View style={styles.navButtonLeft}>
-          <Ionicons name="list-outline" size={20} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.navButtonText}>Prehľad inventúry</Text>
-        </View>
-        <View style={styles.navButtonRight}>
-          <Text style={styles.navButtonCount}>{scannedCount} produktov</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Inventúra</Text>
+        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+          <Ionicons name="log-out-outline" size={24} color="rgba(255,255,255,0.6)" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        {/* Navigation buttons */}
+        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("InventoryList")}>
+          <View style={styles.navButtonLeft}>
+            <Ionicons name="list-outline" size={20} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.navButtonText}>Prehľad inventúry</Text>
+          </View>
+          <View style={styles.navButtonRight}>
+            <Text style={styles.navButtonCount}>{scannedCount} produktov</Text>
+            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navButton, { marginBottom: 16 }]}
+          onPress={() => navigation.navigate("MissingProducts")}
+        >
+          <View style={styles.navButtonLeft}>
+            <Ionicons name="alert-circle-outline" size={20} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
+            {missingCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{missingCount}</Text>
+              </View>
+            )}
+          </View>
           <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate("MissingProducts")}>
-        <View style={styles.navButtonLeft}>
-          <Ionicons name="alert-circle-outline" size={20} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.navButtonText}>Nenaskenované produkty</Text>
-          {missingCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{missingCount}</Text>
-            </View>
-          )}
-        </View>
-        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
-      </TouchableOpacity>
-
-      {/* Error message */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={16} color="#f87171" />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {/* Success message */}
-      {saveSuccess && (
-        <View style={styles.successContainer}>
-          <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
-          <Text style={styles.successText}>Produkt uložený!</Text>
-        </View>
-      )}
-
-      {/* Camera */}
-      {!product && !saveSuccess && (
-        <>
-          <View style={styles.cameraContainer}>
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              onBarcodeScanned={cameraActive && !loading ? handleBarCodeScanned : undefined}
-              barcodeScannerSettings={{
-                barcodeTypes: ["ean8", "ean13"],
-              }}
-            />
-            <View style={styles.scanOverlay}>
-              <View style={styles.scanFrame}>
-                <View style={[styles.corner, styles.cornerTL]} />
-                <View style={[styles.corner, styles.cornerTR]} />
-                <View style={[styles.corner, styles.cornerBL]} />
-                <View style={[styles.corner, styles.cornerBR]} />
-              </View>
-            </View>
-            <View style={styles.scanStatusContainer}>
-              <View
-                style={[styles.scanStatusBadge, loading && styles.scanStatusLoading, error && styles.scanStatusError]}
-              >
-                {loading && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
-                <Text style={styles.scanStatusText}>{loading ? "Hľadám produkt..." : scanStatus}</Text>
-              </View>
-            </View>
+        {/* Error message */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={16} color="#f87171" />
+            <Text style={styles.errorText}>{error}</Text>
           </View>
+        )}
 
-          {/* Manual input */}
-          <View style={styles.manualInputContainer}>
-            <Text style={styles.sectionTitle}>Manuálne zadanie EAN</Text>
-            <Text style={styles.sectionSubtitle}>Alebo zadajte EAN kód ručne</Text>
+        {/* Success message */}
+        {saveSuccess && (
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
+            <Text style={styles.successText}>Produkt uložený!</Text>
+          </View>
+        )}
 
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="123 456 789 1011"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={manualEan}
-                onChangeText={setManualEan}
-                keyboardType="numeric"
-                maxLength={13}
+        {/* Camera */}
+        {!product && !saveSuccess && (
+          <>
+            <View style={styles.cameraContainer}>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                onBarcodeScanned={cameraActive && !loading ? handleBarCodeScanned : undefined}
+                barcodeScannerSettings={{
+                  barcodeTypes: ["ean8", "ean13"],
+                }}
               />
-              {manualEan.length > 0 && (
-                <TouchableOpacity style={styles.clearButton} onPress={() => setManualEan("")}>
-                  <Ionicons name="close" size={20} color="rgba(255,255,255,0.4)" />
-                </TouchableOpacity>
-              )}
+              <View style={styles.scanOverlay}>
+                <View style={styles.scanFrame}>
+                  <View style={[styles.corner, styles.cornerTL]} />
+                  <View style={[styles.corner, styles.cornerTR]} />
+                  <View style={[styles.corner, styles.cornerBL]} />
+                  <View style={[styles.corner, styles.cornerBR]} />
+                </View>
+              </View>
+              <View style={styles.scanStatusContainer}>
+                <View
+                  style={[styles.scanStatusBadge, loading && styles.scanStatusLoading, error && styles.scanStatusError]}
+                >
+                  {loading && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />}
+                  <Text style={styles.scanStatusText}>{loading ? "Hľadám produkt..." : scanStatus}</Text>
+                </View>
+              </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.submitButton, loading && styles.buttonDisabled]}
-              onPress={() => handleEanSubmit(manualEan)}
-              disabled={loading || !manualEan.trim()}
-            >
-              {loading ? (
-                <View style={styles.buttonContent}>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.buttonText}>Hľadám...</Text>
-                </View>
-              ) : (
-                <Text style={styles.buttonText}>Zadať EAN</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+            {/* Manual input */}
+            <View style={styles.manualInputContainer}>
+              <Text style={styles.sectionTitle}>Manuálne zadanie EAN</Text>
+              <Text style={styles.sectionSubtitle}>Alebo zadajte EAN kód ručne</Text>
 
-      {/* Product detail */}
-      {product && !saveSuccess && (
-        <View style={styles.productContainer}>
-          <View style={styles.productCard}>
-            <View style={styles.productHeader}>
-              <View style={styles.productIcon}>
-                <Text style={styles.productIconText}>🍾</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="123 456 789 1011"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={manualEan}
+                  onChangeText={setManualEan}
+                  keyboardType="numeric"
+                  maxLength={13}
+                />
+                {manualEan.length > 0 && (
+                  <TouchableOpacity style={styles.clearButton} onPress={() => setManualEan("")}>
+                    <Ionicons name="close" size={20} color="rgba(255,255,255,0.4)" />
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={styles.productInfo}>
-                <View style={styles.productTitleRow}>
-                  <Text style={styles.productName}>{product.name}</Text>
+
+              <TouchableOpacity
+                style={[styles.submitButton, (loading || !manualEan.trim()) && styles.buttonDisabled]}
+                onPress={() => handleEanSubmit(manualEan)}
+                disabled={loading || !manualEan.trim()}
+              >
+                {loading ? (
+                  <View style={styles.buttonContent}>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={styles.buttonText}>Hľadám...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.buttonText}>Zadať EAN</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* Product detail */}
+        {product && !saveSuccess && (
+          <View style={styles.productContainer}>
+            <View style={styles.productCard}>
+              <View style={styles.productHeader}>
+                <View style={styles.productIcon}>
+                  <Text style={styles.productIconText}>🍾</Text>
+                </View>
+                <View style={styles.productInfo}>
+                  <View style={styles.productTitleRow}>
+                    <Text style={styles.productName}>{product.name}</Text>
+                  </View>
                   {product.alcohol_content && product.alcohol_content !== "0" && (
                     <Text style={styles.productAlcohol}>{product.alcohol_content}%</Text>
                   )}
+                  <Text style={styles.productEan}>{currentEan}</Text>
+                  <View style={styles.productMeta}>
+                    {product.volume && <Text style={styles.productVolume}>{product.volume}</Text>}
+                    <Text style={styles.productQuantity}>{quantity || "?"} ks</Text>
+                  </View>
                 </View>
-                <Text style={styles.productEan}>{currentEan}</Text>
-                <View style={styles.productMeta}>
-                  {product.volume && <Text style={styles.productVolume}>{product.volume}</Text>}
-                  <Text style={styles.productQuantity}>{quantity || "?"} ks</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={resetScanner} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#f87171" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.quantitySection}>
-              <Text style={styles.quantityLabel}>Počet na sklade</Text>
-              <View style={styles.quantityControls}>
-                <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(-1)}>
-                  <Ionicons name="remove" size={24} color="#fff" />
-                </TouchableOpacity>
-
-                <View style={styles.quantityInputContainer}>
-                  <TextInput
-                    style={styles.quantityInput}
-                    value={quantity}
-                    onChangeText={setQuantity}
-                    keyboardType="numeric"
-                    textAlign="center"
-                  />
-                  <Text style={styles.quantityUnit}>ks</Text>
-                </View>
-
-                <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(1)}>
-                  <Ionicons name="add" size={24} color="#fff" />
+                <TouchableOpacity onPress={resetScanner} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color="#f87171" />
                 </TouchableOpacity>
               </View>
+
+              <View style={styles.quantitySection}>
+                <Text style={styles.quantityLabel}>Počet na sklade</Text>
+                <View style={styles.quantityControls}>
+                  <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(-1)}>
+                    <Ionicons name="remove" size={24} color="#fff" />
+                  </TouchableOpacity>
+
+                  <View style={styles.quantityInputContainer}>
+                    <TextInput
+                      style={styles.quantityInput}
+                      value={quantity}
+                      onChangeText={setQuantity}
+                      keyboardType="numeric"
+                      textAlign="center"
+                    />
+                    <Text style={styles.quantityUnit}>ks</Text>
+                  </View>
+
+                  <TouchableOpacity style={styles.quantityButton} onPress={() => adjustQuantity(1)}>
+                    <Ionicons name="add" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
+
+            <TouchableOpacity
+              style={[styles.saveButton, (saving || !quantity) && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={saving || !quantity}
+            >
+              {saving ? (
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.saveButtonText}>Ukladám...</Text>
+                </View>
+              ) : (
+                <Text style={styles.saveButtonText}>Uložiť</Text>
+              )}
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={[styles.saveButton, saving && styles.buttonDisabled]}
-            onPress={handleSave}
-            disabled={saving || !quantity}
-          >
-            {saving ? (
-              <View style={styles.buttonContent}>
-                <ActivityIndicator color="#fff" size="small" />
-                <Text style={styles.saveButtonText}>Ukladám...</Text>
-              </View>
-            ) : (
-              <Text style={styles.saveButtonText}>Uložiť</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
@@ -400,6 +413,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a1a1a",
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  logoutButton: {
+    padding: 8,
+  },
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
     padding: 16,
@@ -728,15 +761,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2e2e38",
     borderRadius: 8,
-    paddingRight: 16,
+    height: 48,
+    paddingHorizontal: 16,
   },
   quantityInput: {
     flex: 1,
-    height: 48,
+    color: "#fff",
     fontSize: 20,
     fontWeight: "600",
-    color: "#fff",
-    textAlign: "center",
   },
   quantityUnit: {
     color: "rgba(255,255,255,0.5)",

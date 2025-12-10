@@ -4,7 +4,6 @@ import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import { AuthProvider, useAuth } from "./src/lib/auth-context"
 import { LoginScreen } from "./src/screens/LoginScreen"
-import { HomeScreen } from "./src/screens/HomeScreen"
 import { ScannerScreen } from "./src/screens/ScannerScreen"
 import { InventoryListScreen } from "./src/screens/InventoryListScreen"
 import { MissingProductsScreen } from "./src/screens/MissingProductsScreen"
@@ -13,7 +12,6 @@ import { ActivityIndicator, View } from "react-native"
 
 export type RootStackParamList = {
   Login: undefined
-  Home: undefined
   Scanner: { pendingEan?: string }
   InventoryList: undefined
   MissingProducts: undefined
@@ -45,13 +43,28 @@ function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       ) : (
         <>
-          <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Scanner" component={ScannerScreen} options={{ title: "Skenovanie" }} />
-          <Stack.Screen name="InventoryList" component={InventoryListScreen} options={{ title: "Prehľad inventúry" }} />
+          <Stack.Screen
+            name="Scanner"
+            component={ScannerScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="InventoryList"
+            component={InventoryListScreen}
+            options={{
+              title: "Prehľad inventúry",
+              headerBackTitle: "Späť",
+            }}
+          />
           <Stack.Screen
             name="MissingProducts"
             component={MissingProductsScreen}
-            options={{ title: "Nenaskenované produkty" }}
+            options={{
+              title: "Nenaskenované produkty",
+              headerBackTitle: "Späť",
+            }}
           />
         </>
       )}
