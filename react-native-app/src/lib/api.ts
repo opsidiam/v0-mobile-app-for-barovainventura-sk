@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://barovainventura.sk/api"
+const API_BASE_URL = "https://api.barovainventura.sk/api"
 
 export interface Product {
   id: number
@@ -6,6 +6,7 @@ export interface Product {
   ean: string
   quantity_on_stock: number
   unit: string
+  scan_id?: number
 }
 
 export interface InventoryItem {
@@ -14,10 +15,10 @@ export interface InventoryItem {
   ean: string
   quantity: number
   unit: string
+  scannedAt?: string
 }
 
 export interface MissingProduct {
-  id: number
   name: string
   ean: string
 }
@@ -43,63 +44,80 @@ class ApiClient {
         ...options.headers,
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const url = `${API_BASE_URL}${endpoint}`
+      console.log(`[API] Fetching: ${url}`)
+      const response = await fetch(url, {
         ...options,
         headers,
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        return { success: false, error: data.message || "Chyba servera" }
+        console.warn(`[API] Error ${response.status} from ${url}`)
+        return { success: false, error: `Error ${response.status}: ${response.statusText}` }
+      }
+
+      const text = await response.text()
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch (e) {
+        console.error(`[API] Failed to parse JSON from ${url}:`, text.substring(0, 200))
+        return { success: false, error: "Server returned invalid response from " + endpoint }
       }
 
       return { success: true, data }
     } catch (error) {
-      return { success: false, error: "Chyba pripojenia k serveru" }
+      console.error("API Request Error:", error)
+      return { success: false, error: "Chyba: " + (error instanceof Error ? error.message : String(error)) }
     }
   }
 
-  async login(username: string, password: string) {
-    return this.request<{ token: string; user: { name: string } }>("/auth/login", {
+  async login(user_id: string, password_hash: string) {
+    return this.request<{
+      token: string
+      token_type: string
+      token_expire: number
+      inv_id: string
+      multiple_products: boolean
+      user_name: string
+      news_message: string
+      news_color: string
+    }>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ user_id, password: password_hash }),
     })
   }
 
   async getProduct(ean: string) {
-    return this.request<Product>(`/product/get?ean=${ean}`)
-  }
-
-  async saveProductQuantity(ean: string, quantity: number) {
-    return this.request<{ success: boolean }>("/product/save-quantity", {
+    const response = await this.request<{ product_found: Product }>("/product/get-by-ean", {
       method: "POST",
-      body: JSON.stringify({ ean, quantity }),
+      body: JSON.stringify({ ean }),
     })
+
+    if (response.success && response.data?.product_found) {
+      return { success: true, data: { ...response.data.product_found, ean } }
+    }
+
+    return { success: false, error: response.error || "Produkt sa nenašiel" }
   }
 
-  async getInventoryList() {
-    return this.request<{ items: InventoryItem[]; total: number }>("/inventory/list")
+  async saveProductQuantity(product: Product, quantity: number) {
+    const body = {
+      scan_id: product.scan_id || 0,
+      ean: product.ean,
+      full_pack: quantity,
+      weight: 0,
+      type: 1
+    }
+
+    return this.request<{ success: boolean; update_product: string; scan_id: string }>("/product/update", {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
   }
 
   async getMissingProducts() {
-    return this.request<{ items: MissingProduct[]; total: number }>("/product/get-missing-products")
-  }
-
-  async startInventory() {
-    return this.request<{ success: boolean }>("/inventory/start", {
-      method: "POST",
-    })
-  }
-
-  async completeInventory() {
-    return this.request<{ success: boolean }>("/inventory/complete", {
-      method: "POST",
-    })
-  }
-
-  async getInventoryStatus() {
-    return this.request<{ active: boolean; startedAt?: string }>("/inventory/status")
+    return this.request<{ missing_products: MissingProduct[]; total: number }>("/product/get-missing-products")
   }
 }
 

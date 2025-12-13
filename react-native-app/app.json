@@ -9,7 +9,9 @@
     "splash": {
       "backgroundColor": "#0f172a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "sk.barovainventura.app",
@@ -22,7 +24,9 @@
         "backgroundColor": "#0f172a"
       },
       "package": "sk.barovainventura.app",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA"
+      ]
     },
     "plugins": [
       [
@@ -30,7 +34,8 @@
         {
           "cameraPermission": "Aplikácia potrebuje prístup ku kamere na skenovanie čiarových kódov."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

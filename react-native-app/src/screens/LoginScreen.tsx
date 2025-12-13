@@ -7,42 +7,56 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
+  Alert,
   Platform,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+  Linking,
 } from "react-native"
 import { useAuth } from "../lib/auth-context"
+import { Logo } from "../components/Logo"
 
 export function LoginScreen() {
-  const { login } = useAuth()
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const { login } = useAuth()
 
   async function handleLogin() {
     if (!username || !password) {
-      setError("Vyplňte všetky polia")
+      setError("Zadajte prihlasovací kód a heslo")
       return
     }
 
     setIsLoading(true)
     setError("")
 
-    const result = await login(username, password)
-
-    if (!result.success) {
-      setError(result.error || "Prihlásenie zlyhalo")
+    try {
+      if (Platform.OS === 'web') {
+        // Web-specific login wrapper if needed or just straight call
+        await login(username, password)
+      } else {
+        await login(username, password)
+      }
+    } catch (err) {
+      setError("Boli zadané zlé prihlasovacie údaje")
+      console.error(err)
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Barová Inventúra</Text>
-        <Text style={styles.subtitle}>Prihláste sa do aplikácie</Text>
+        <View style={styles.logoContainer}>
+          <Logo
+            width={180}
+            height={60}
+            url="https://barovainventura.sk/img/V1%20alt%20-%20W.svg"
+          />
+        </View>
 
         {error ? (
           <View style={styles.errorContainer}>
@@ -50,36 +64,52 @@ export function LoginScreen() {
           </View>
         ) : null}
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Používateľské meno</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="Zadajte meno"
-            placeholderTextColor="#64748b"
-          />
+        {/* Warning block removed */}
 
-          <Text style={styles.label}>Heslo</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Zadajte heslo"
-            placeholderTextColor="#64748b"
-          />
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>API ID:</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="123 456"
+              placeholderTextColor="#64748b"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Heslo:</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="zadajte heslo"
+              placeholderTextColor="#64748b"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={isLoading}>
+            {isLoading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Prihlásiť sa</Text>
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
+            style={styles.helpButton}
+            onPress={() => Linking.openURL("https://barovainventura.sk/navody")}
           >
-            {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Prihlásiť sa</Text>}
+            <Text style={styles.helpButtonText}>Návody</Text>
           </TouchableOpacity>
         </View>
+      </View>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>© 2024 Barová inventúra</Text>
       </View>
     </KeyboardAvoidingView>
   )
@@ -88,66 +118,105 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f172a",
+    backgroundColor: "#000000",
   },
   content: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 24,
+    padding: 24,
+    maxWidth: 400,
+    width: "100%",
+    alignSelf: "center",
   },
-  title: {
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 48,
+  },
+  logoTitle: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#fff",
-    textAlign: "center",
-    marginBottom: 8,
+    color: "#ffffff",
+    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#94a3b8",
-    textAlign: "center",
-    marginBottom: 32,
+  logoSubtitle: {
+    fontSize: 18,
+    color: "#ffffff",
+    letterSpacing: 4,
   },
-  errorContainer: {
-    backgroundColor: "#7f1d1d",
-    padding: 12,
+  warningContainer: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)", // Red with low opacity
     borderRadius: 8,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
   },
-  errorText: {
-    color: "#fecaca",
+  warningText: {
+    color: "#ef4444", // Red text
+    fontSize: 14,
     textAlign: "center",
   },
   form: {
     gap: 16,
   },
+  inputGroup: {
+    gap: 8,
+  },
   label: {
     fontSize: 14,
-    color: "#e2e8f0",
+    fontWeight: "bold", // "Bold" in mockup
+    color: "#ffffff",
     marginBottom: 4,
   },
   input: {
-    backgroundColor: "#1e293b",
+    backgroundColor: "#1e293b", // Dark slate
     borderRadius: 8,
     padding: 16,
     fontSize: 16,
-    color: "#fff",
+    color: "#ffffff",
     borderWidth: 1,
     borderColor: "#334155",
   },
-  button: {
-    backgroundColor: "#3b82f6",
-    padding: 16,
+  loginButton: {
+    backgroundColor: "#22c55e", // Green button
     borderRadius: 8,
+    padding: 16,
     alignItems: "center",
     marginTop: 8,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
+  loginButtonText: {
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "bold",
+  },
+  errorContainer: {
+    backgroundColor: "#fecaca",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#dc2626",
+    textAlign: "center",
+  },
+  footer: {
+    padding: 24,
+    paddingBottom: 48, // Increased padding to move text up
+    alignItems: "center",
+  },
+  footerText: {
+    color: "#64748b",
+    fontSize: 12,
+  },
+  helpButton: {
+    backgroundColor: "#334155", // Slate 700
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+  },
+  helpButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 })

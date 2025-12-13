@@ -2,6 +2,7 @@
 import { StatusBar } from "expo-status-bar"
 import { View, ActivityIndicator, StyleSheet } from "react-native"
 import { AuthProvider, useAuth } from "./src/lib/auth-context"
+import { InventoryProvider } from "./src/lib/inventory-context"
 import { LoginScreen } from "./src/screens/LoginScreen"
 import { HomeScreen } from "./src/screens/HomeScreen"
 
@@ -22,8 +23,10 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
-      <AppContent />
+      <InventoryProvider>
+        <StatusBar style="light" />
+        <AppContent />
+      </InventoryProvider>
     </AuthProvider>
   )
 }

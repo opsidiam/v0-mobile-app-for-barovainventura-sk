@@ -1,87 +1,94 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl } from "react-native"
 import { api, type MissingProduct } from "../lib/api"
+import { useInventory } from "../lib/inventory-context"
+import Svg, { Path, Rect, Circle, G } from "react-native-svg"
 
 interface MissingProductsScreenProps {
+  user?: any
   onBack: () => void
   onScanProduct: (ean: string) => void
 }
 
-export function MissingProductsScreen({ onBack, onScanProduct }: MissingProductsScreenProps) {
-  const [items, setItems] = useState<MissingProduct[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+export function MissingProductsScreen({ user, onBack, onScanProduct }: MissingProductsScreenProps) {
+  const { missingItems = [], refreshMissingItems, isLoading: isContextLoading } = useInventory()
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    loadItems()
-
-    // Auto-refresh every 5 seconds
-    intervalRef.current = setInterval(loadItems, 5000)
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [])
-
-  async function loadItems() {
-    const response = await api.getMissingProducts()
-    if (response.success && response.data) {
-      setItems(response.data.items)
-    }
-    setIsLoading(false)
-    setIsRefreshing(false)
-  }
+  // Use items from context. 
+  // No local useEffect for interval/loading needed as context handles it.
 
   function handleRefresh() {
     setIsRefreshing(true)
-    loadItems()
+    refreshMissingItems().finally(() => setIsRefreshing(false))
   }
 
   function renderItem({ item }: { item: MissingProduct }) {
     return (
-      <View style={styles.item}>
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          <Text style={styles.itemEan}>{item.ean}</Text>
+      <View style={styles.itemCard}>
+
+        {/* Header: Icon + Name */}
+        <View style={styles.cardHeader}>
+          {/* Bottle Icon Placeholder */}
+          <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{ marginRight: 12 }}>
+            <Path d="M9 3h6v4h-6z M10 7v6l-4 4v4h16v-4l-4-4v-6" strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+          <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => onScanProduct(item.ean)}>
-          <Text style={styles.addButtonText}>+</Text>
+
+        {/* EAN Row */}
+        <View style={styles.infoRow}>
+          <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
+            <Path d="M3 4h2v16h-2z M8 4h1v16h-1z M12 4h2v16h-2z M17 4h1v16h-1z M21 4h2v16h-2z" />
+          </Svg>
+          <Text style={styles.infoText}>{item.ean}</Text>
+        </View>
+
+        <TouchableOpacity style={styles.scanActionButton} onPress={() => onScanProduct(item.ean)}>
+          <Text style={styles.scanActionText}>Naskenovať</Text>
         </TouchableOpacity>
       </View>
     )
   }
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-      </View>
-    )
-  }
+  // Removed local isLoading check
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Späť</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Nenaskenované produkty</Text>
-        {items.length > 0 && (
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={onBack} style={styles.whiteBackButton}>
+            <Text style={styles.whiteBackButtonText}>← Nazad</Text>
+          </TouchableOpacity>
+
+          <View style={styles.headerInfoRight}>
+            <View style={styles.headerInfoItem}>
+              <Text style={styles.headerLabel}>Meno</Text>
+              <Text style={styles.headerValue}>{user?.name || "---"}</Text>
+            </View>
+            <View style={styles.headerInfoItem}>
+              <Text style={styles.headerLabel}>ID inventúry</Text>
+              <Text style={styles.headerValue}>{user?.inv_id || "---"}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Title Row below header */}
+      <View style={styles.subHeader}>
+        <Text style={styles.subTitle}>Nenaskenované produkty</Text>
+        {missingItems.length > 0 && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{items.length}</Text>
+            <Text style={styles.badgeText}>{missingItems.length}</Text>
           </View>
         )}
       </View>
 
+
       <FlatList
-        data={items}
+        data={missingItems}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.ean}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#3b82f6" />}
         ListEmptyComponent={
@@ -97,84 +104,116 @@ export function MissingProductsScreen({ onBack, onScanProduct }: MissingProducts
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f172a",
+    backgroundColor: "#000",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#0f172a",
+    backgroundColor: "#000",
   },
   header: {
+    padding: 16,
+    paddingTop: 60,
+    backgroundColor: "#000",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  whiteBackButton: {
+    backgroundColor: "#fff",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  whiteBackButtonText: {
+    color: "#000",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  headerInfoRight: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  headerInfoItem: {
+    alignItems: "flex-end",
+  },
+  headerLabel: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  headerValue: {
+    color: "#fff",
+    fontSize: 12,
+  },
+  subHeader: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    gap: 8,
   },
-  backButton: {
-    marginRight: 16,
-  },
-  backButtonText: {
-    color: "#3b82f6",
-    fontSize: 16,
-  },
-  title: {
+  subTitle: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
-    flex: 1,
   },
   badge: {
     backgroundColor: "#ef4444",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 12,
-    minWidth: 28,
-    alignItems: "center",
   },
   badgeText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "bold",
   },
   list: {
     padding: 16,
     gap: 12,
   },
-  item: {
-    backgroundColor: "#1e293b",
+  itemCard: {
+    backgroundColor: "#0f172a", // Dark Slate card
     borderRadius: 12,
     padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
   },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
+  cardTitle: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 4,
-  },
-  itemEan: {
-    color: "#64748b",
-    fontSize: 12,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: "#3b82f6",
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addButtonText: {
-    color: "#fff",
-    fontSize: 24,
     fontWeight: "bold",
+    flex: 1,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  infoText: {
+    color: "#94a3b8",
+    fontSize: 14,
+  },
+  scanActionButton: {
+    backgroundColor: "#3b82f6",
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  scanActionText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
   },
   emptyContainer: {
     alignItems: "center",

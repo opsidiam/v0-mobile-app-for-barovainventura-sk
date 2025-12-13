@@ -1,0 +1,9 @@
+{
+  "android": {
+    "package": "com.anonymous.myv0project"
+  },
+  "plugins": [
+    "expo-barcode-scanner",
+    "expo-secure-store"
+  ]
+}

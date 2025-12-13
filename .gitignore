@@ -1,2 +1,5 @@
 /.next
 /node_modules
+/.expo
+/.idea
+/react-native-app/node_modules
