@@ -12,7 +12,6 @@
     "@react-navigation/native": "^6.1.0",
     "@react-navigation/native-stack": "^6.9.0",
     "expo": "^54.0.29",
-    "expo-barcode-scanner": "~12.9.0",
     "expo-camera": "~17.0.10",
     "expo-crypto": "~15.0.8",
     "expo-secure-store": "~15.0.8",

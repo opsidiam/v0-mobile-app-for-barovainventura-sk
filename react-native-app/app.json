@@ -25,7 +25,9 @@
       },
       "package": "sk.barovainventura.app",
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -36,6 +38,12 @@
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7a0aec3d-3c70-483b-8611-9287e2c8424b"
+      }
+    },
+    "owner": "opsidiam"
   }
 }

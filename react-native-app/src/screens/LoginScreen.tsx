@@ -109,7 +109,7 @@ export function LoginScreen() {
         </View>
       </View>
       <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2024 Barová inventúra</Text>
+        <Text style={styles.footerText}>© 2025 Barová inventúra</Text>
       </View>
     </KeyboardAvoidingView>
   )
